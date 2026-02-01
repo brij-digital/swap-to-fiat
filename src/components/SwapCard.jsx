@@ -157,13 +157,7 @@ export default function SwapCard() {
   const handleSwap = async () => {
     if (!sellAmount || parseFloat(sellAmount) <= 0) return;
 
-    // Show partners modal if multiple options
-    if (partners.length > 1) {
-      setShowPartners(true);
-      return;
-    }
-
-    // Direct redirect if only one partner
+    // Direct redirect to best partner
     if (bestPartner) {
       await handleCreateOrder(bestPartner);
     }
@@ -183,7 +177,7 @@ export default function SwapCard() {
       });
       
       if (result.redirectUrl) {
-        window.open(result.redirectUrl, '_blank');
+        window.location.href = result.redirectUrl;
       }
     } catch (err) {
       setError(err.message);
