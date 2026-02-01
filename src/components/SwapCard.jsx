@@ -115,7 +115,7 @@ export default function SwapCard() {
         const fiatTokens = methods.map((pm) => ({
           id: pm.code,
           name: `EUR ${pm.name}`,
-          icon: pm.icon,
+          icon: `${BASE}eur.svg`, // Use EUR icon for all fiat options
           code: 'EUR',
           paymentMethod: pm.code,
           type: 'fiat',
