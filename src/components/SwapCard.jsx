@@ -7,6 +7,87 @@ import {
 
 const BASE = import.meta.env.BASE_URL;
 
+// Country to currency mapping
+const COUNTRY_CURRENCY_MAP = {
+  // Europe (EUR)
+  ESP: 'EUR', FRA: 'EUR', DEU: 'EUR', ITA: 'EUR', PRT: 'EUR', NLD: 'EUR', BEL: 'EUR', 
+  AUT: 'EUR', IRL: 'EUR', FIN: 'EUR', GRC: 'EUR', LUX: 'EUR', SVN: 'EUR', SVK: 'EUR',
+  EST: 'EUR', LVA: 'EUR', LTU: 'EUR', MLT: 'EUR', CYP: 'EUR',
+  // UK
+  GBR: 'GBP',
+  // US
+  USA: 'USD',
+  // Australia
+  AUS: 'AUD',
+  // Canada
+  CAN: 'CAD',
+  // Switzerland
+  CHE: 'CHF',
+  // Japan
+  JPN: 'JPY',
+  // Czech
+  CZE: 'CZK',
+  // Poland
+  POL: 'PLN',
+  // Sweden
+  SWE: 'SEK',
+  // Norway
+  NOR: 'NOK',
+  // Denmark
+  DNK: 'DKK',
+  // Brazil
+  BRA: 'BRL',
+  // Mexico
+  MEX: 'MXN',
+  // India
+  IND: 'INR',
+  // Singapore
+  SGP: 'SGD',
+  // Hong Kong
+  HKG: 'HKD',
+  // New Zealand
+  NZL: 'NZD',
+  // South Africa
+  ZAF: 'ZAR',
+  // Thailand
+  THA: 'THB',
+  // Philippines
+  PHL: 'PHP',
+  // Indonesia
+  IDN: 'IDR',
+  // Malaysia
+  MYS: 'MYR',
+  // Vietnam
+  VNM: 'VND',
+  // Turkey
+  TUR: 'TRY',
+  // Israel
+  ISR: 'ILS',
+  // UAE
+  ARE: 'AED',
+  // Saudi
+  SAU: 'SAR',
+  // South Korea
+  KOR: 'KRW',
+  // Argentina
+  ARG: 'ARS',
+  // Colombia
+  COL: 'COP',
+  // Chile
+  CHL: 'CLP',
+  // Peru
+  PER: 'PEN',
+};
+
+// Currency symbols for display
+const CURRENCY_SYMBOLS = {
+  EUR: '€', USD: '$', GBP: '£', AUD: 'A$', CAD: 'C$', CHF: 'CHF', JPY: '¥',
+  CZK: 'Kč', PLN: 'zł', SEK: 'kr', NOK: 'kr', DKK: 'kr', BRL: 'R$', MXN: '$',
+  INR: '₹', SGD: 'S$', HKD: 'HK$', NZD: 'NZ$', ZAR: 'R', THB: '฿', PHP: '₱',
+  IDR: 'Rp', MYR: 'RM', VND: '₫', TRY: '₺', ILS: '₪', AED: 'د.إ', SAR: '﷼',
+  KRW: '₩', ARS: '$', COP: '$', CLP: '$', PEN: 'S/',
+};
+
 // Sell tokens (crypto) - hardcoded
 const SELL_TOKENS = [
   { id: 'SOL', name: 'SOL', icon: `${BASE}sol.svg`, code: 'SOLANA_SOL' },
@@ -53,7 +134,7 @@ function TokenDropdown({ tokens, selected, onSelect, loading }) {
       </button>
       
       {open && (
-        <div className="absolute right-0 top-full mt-2 bg-[#1a1a2e] border border-[#3a3a4e] rounded-xl overflow-hidden z-50 min-w-[180px] shadow-xl">
+        <div className="absolute right-0 top-full mt-2 bg-[#1a1a2e] border border-[#3a3a4e] rounded-xl overflow-hidden z-50 min-w-[200px] shadow-xl">
           {tokens.map((token) => (
             <button
               key={token.id}
@@ -63,9 +144,9 @@ function TokenDropdown({ tokens, selected, onSelect, loading }) {
               }`}
             >
               <img src={token.icon} alt={token.name} className="w-6 h-6 rounded-full" />
-              <span>{token.name}</span>
+              <span className="truncate">{token.name}</span>
               {selected.id === token.id && (
-                <svg className="w-4 h-4 text-violet-400 ml-auto" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-4 h-4 text-violet-400 ml-auto flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
               )}
@@ -77,12 +158,21 @@ function TokenDropdown({ tokens, selected, onSelect, loading }) {
   );
 }
 
+// Generate currency icon dynamically
+function getCurrencyIcon(currencyCode) {
+  const symbol = CURRENCY_SYMBOLS[currencyCode] || currencyCode;
+  // Return a data URL SVG with the currency symbol
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="32" fill="%23003399"/><text x="32" y="42" font-family="Arial" font-size="24" font-weight="bold" fill="%23FFCC00" text-anchor="middle">${encodeURIComponent(symbol)}</text></svg>`;
+  return `data:image/svg+xml,${svg}`;
+}
+
 export default function SwapCard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
-  // Detected country from API
+  // Detected country and currency from API
   const [countryCode, setCountryCode] = useState(null);
+  const [detectedCurrency, setDetectedCurrency] = useState(null);
   
   // Dynamic buy tokens (fiat options from API)
   const [buyTokens, setBuyTokens] = useState([]);
@@ -99,24 +189,40 @@ export default function SwapCard() {
     const loadPaymentMethods = async () => {
       setLoadingBuyTokens(true);
       try {
-        const result = await getSupportedPaymentMethods({
+        // First, detect country by making a request without specifying currency
+        // We'll try EUR first to get the country code
+        const detectResult = await getSupportedPaymentMethods({
           rampType: 'OFFRAMP',
           fromCurrency: sellToken.code,
           toCurrency: 'EUR',
         });
         
-        // Store detected country
-        if (result.countryCode) {
-          setCountryCode(result.countryCode);
+        const country = detectResult.countryCode;
+        setCountryCode(country);
+        
+        // Map country to currency
+        const currency = COUNTRY_CURRENCY_MAP[country] || 'EUR';
+        setDetectedCurrency(currency);
+        
+        // Now fetch payment methods for the correct currency
+        let result = detectResult;
+        if (currency !== 'EUR') {
+          result = await getSupportedPaymentMethods({
+            rampType: 'OFFRAMP',
+            fromCurrency: sellToken.code,
+            toCurrency: currency,
+          });
         }
         
         // Convert payment methods to buy tokens (max 3)
         const methods = (result.paymentMethods || []).slice(0, 3);
+        const currencyIcon = getCurrencyIcon(currency);
+        
         const fiatTokens = methods.map((pm) => ({
-          id: pm.code,
-          name: `EUR ${pm.name}`,
-          icon: `${BASE}eur.svg`, // Use EUR icon for all fiat options
-          code: 'EUR',
+          id: `${currency}_${pm.code}`,
+          name: `${currency} ${pm.name}`,
+          icon: currencyIcon,
+          code: currency,
           paymentMethod: pm.code,
           type: 'fiat',
         }));
@@ -246,6 +352,8 @@ export default function SwapCard() {
     return 'Get Quote';
   };
 
+  const currencySymbol = CURRENCY_SYMBOLS[detectedCurrency] || detectedCurrency || '';
+
   return (
     <div className="w-full max-w-md mx-auto">
       {/* Header */}
@@ -257,7 +365,7 @@ export default function SwapCard() {
           </svg>
         </button>
         <div className="bg-[#1a1a2e] rounded-full px-4 py-2 text-sm text-gray-300">
-          {countryCode ? `🌍 ${countryCode}` : 'Detecting...'}
+          {countryCode ? `🌍 ${countryCode} • ${detectedCurrency}` : 'Detecting...'}
         </div>
       </div>
 
@@ -331,7 +439,7 @@ export default function SwapCard() {
           )}
         </div>
         <div className="text-gray-500 text-sm">
-          {buyAmount ? `€${parseFloat(buyAmount).toFixed(2)}` : '€0.00'}
+          {buyAmount && buyToken?.type === 'fiat' ? `${currencySymbol}${parseFloat(buyAmount).toFixed(2)}` : '$0.00'}
         </div>
       </div>
 
