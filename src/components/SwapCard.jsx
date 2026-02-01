@@ -15,7 +15,7 @@ const SELL_TOKENS = [
 
 const BUY_TOKENS = [
   { id: 'USDC', name: 'USDC', icon: `${BASE}usdc.svg`, type: 'crypto', code: 'SOLANA_USDC' },
-  { id: 'EUR_SEPA', name: 'EUR (SEPA)', icon: `${BASE}eur.svg`, type: 'fiat', code: 'EUR', paymentMethod: 'SEPA' },
+  { id: 'EUR_SEPA', name: 'EUR (SEPA)', icon: `${BASE}eur.svg`, type: 'fiat', code: 'EUR', paymentMethod: 'EUR_SEPA' },
   { id: 'EUR_CARD', name: 'EUR (Card)', icon: `${BASE}card.svg`, type: 'fiat', code: 'EUR', paymentMethod: 'CARD' },
 ];
 
