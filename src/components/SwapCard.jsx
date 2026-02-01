@@ -7,78 +7,6 @@ import {
 
 const BASE = import.meta.env.BASE_URL;
 
-// Country to currency mapping
-const COUNTRY_CURRENCY_MAP = {
-  // Europe (EUR)
-  ESP: 'EUR', FRA: 'EUR', DEU: 'EUR', ITA: 'EUR', PRT: 'EUR', NLD: 'EUR', BEL: 'EUR', 
-  AUT: 'EUR', IRL: 'EUR', FIN: 'EUR', GRC: 'EUR', LUX: 'EUR', SVN: 'EUR', SVK: 'EUR',
-  EST: 'EUR', LVA: 'EUR', LTU: 'EUR', MLT: 'EUR', CYP: 'EUR',
-  // UK
-  GBR: 'GBP',
-  // US
-  USA: 'USD',
-  // Australia
-  AUS: 'AUD',
-  // Canada
-  CAN: 'CAD',
-  // Switzerland
-  CHE: 'CHF',
-  // Japan
-  JPN: 'JPY',
-  // Czech
-  CZE: 'CZK',
-  // Poland
-  POL: 'PLN',
-  // Sweden
-  SWE: 'SEK',
-  // Norway
-  NOR: 'NOK',
-  // Denmark
-  DNK: 'DKK',
-  // Brazil
-  BRA: 'BRL',
-  // Mexico
-  MEX: 'MXN',
-  // India
-  IND: 'INR',
-  // Singapore
-  SGP: 'SGD',
-  // Hong Kong
-  HKG: 'HKD',
-  // New Zealand
-  NZL: 'NZD',
-  // South Africa
-  ZAF: 'ZAR',
-  // Thailand
-  THA: 'THB',
-  // Philippines
-  PHL: 'PHP',
-  // Indonesia
-  IDN: 'IDR',
-  // Malaysia
-  MYS: 'MYR',
-  // Vietnam
-  VNM: 'VND',
-  // Turkey
-  TUR: 'TRY',
-  // Israel
-  ISR: 'ILS',
-  // UAE
-  ARE: 'AED',
-  // Saudi
-  SAU: 'SAR',
-  // South Korea
-  KOR: 'KRW',
-  // Argentina
-  ARG: 'ARS',
-  // Colombia
-  COL: 'COP',
-  // Chile
-  CHL: 'CLP',
-  // Peru
-  PER: 'PEN',
-};
-
 // Currency symbols for display
 const CURRENCY_SYMBOLS = {
   EUR: '€', USD: '$', GBP: '£', AUD: 'A$', CAD: 'C$', CHF: 'CHF', JPY: '¥',
@@ -161,7 +89,6 @@ function TokenDropdown({ tokens, selected, onSelect, loading }) {
 // Generate currency icon dynamically
 function getCurrencyIcon(currencyCode) {
   const symbol = CURRENCY_SYMBOLS[currencyCode] || currencyCode;
-  // Return a data URL SVG with the currency symbol
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="32" fill="%23003399"/><text x="32" y="42" font-family="Arial" font-size="24" font-weight="bold" fill="%23FFCC00" text-anchor="middle">${encodeURIComponent(symbol)}</text></svg>`;
   return `data:image/svg+xml,${svg}`;
 }
@@ -170,11 +97,11 @@ export default function SwapCard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
-  // Detected country and currency from API
+  // Detected from API
   const [countryCode, setCountryCode] = useState(null);
   const [detectedCurrency, setDetectedCurrency] = useState(null);
   
-  // Dynamic buy tokens (fiat options from API)
+  // Dynamic buy tokens
   const [buyTokens, setBuyTokens] = useState([]);
   const [loadingBuyTokens, setLoadingBuyTokens] = useState(true);
   
@@ -184,35 +111,23 @@ export default function SwapCard() {
   const [buyAmount, setBuyAmount] = useState('');
   const [bestPartner, setBestPartner] = useState(null);
 
-  // Load payment methods on mount (API detects country from IP)
+  // Load payment methods on mount - API auto-detects country AND currency!
   useEffect(() => {
     const loadPaymentMethods = async () => {
       setLoadingBuyTokens(true);
       try {
-        // First, detect country by making a request without specifying currency
-        // We'll try EUR first to get the country code
-        const detectResult = await getSupportedPaymentMethods({
+        // API auto-detects country and returns the right currency
+        const result = await getSupportedPaymentMethods({
           rampType: 'OFFRAMP',
           fromCurrency: sellToken.code,
-          toCurrency: 'EUR',
+          // No toCurrency - API will detect it!
         });
         
-        const country = detectResult.countryCode;
+        const country = result.countryCode;
+        const currency = result.toCurrency;
+        
         setCountryCode(country);
-        
-        // Map country to currency
-        const currency = COUNTRY_CURRENCY_MAP[country] || 'EUR';
         setDetectedCurrency(currency);
-        
-        // Now fetch payment methods for the correct currency
-        let result = detectResult;
-        if (currency !== 'EUR') {
-          result = await getSupportedPaymentMethods({
-            rampType: 'OFFRAMP',
-            fromCurrency: sellToken.code,
-            toCurrency: currency,
-          });
-        }
         
         // Convert payment methods to buy tokens (max 3)
         const methods = (result.paymentMethods || []).slice(0, 3);
@@ -312,8 +227,6 @@ export default function SwapCard() {
 
   const handleSwap = async () => {
     if (!sellAmount || parseFloat(sellAmount) <= 0) return;
-
-    // Direct redirect to best partner
     if (bestPartner) {
       await handleCreateOrder(bestPartner);
     }

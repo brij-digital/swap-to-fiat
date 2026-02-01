@@ -7,8 +7,9 @@ const headers = {
 };
 
 export async function getSupportedPaymentMethods({ countryCode, rampType, fromCurrency, toCurrency }) {
-  const body = { rampType, fromCurrency, toCurrency };
+  const body = { rampType, fromCurrency };
   if (countryCode) body.countryCode = countryCode;
+  if (toCurrency) body.toCurrency = toCurrency;
   
   const response = await fetch(`${API_BASE}/brij.core.v1.customer.Service/GetSupportedPaymentMethods`, {
     method: 'POST',
