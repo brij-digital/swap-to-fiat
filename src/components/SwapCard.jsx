@@ -1,28 +1,19 @@
 import { useState, useRef, useEffect } from 'react';
 import { 
+  getSupportedPaymentMethods,
   getAvailablePartners, 
   createRedirectOrder,
 } from '../services/brij';
 
 const BASE = import.meta.env.BASE_URL;
 
-// Token definitions with icons
-// API expects SOLANA_SOL, SOLANA_USDC format
+// Sell tokens (crypto) - hardcoded
 const SELL_TOKENS = [
-  { id: 'SOL', name: 'SOL', icon: `${BASE}sol.svg`, type: 'crypto', code: 'SOLANA_SOL' },
-  { id: 'USDC', name: 'USDC', icon: `${BASE}usdc.svg`, type: 'crypto', code: 'SOLANA_USDC' },
+  { id: 'SOL', name: 'SOL', icon: `${BASE}sol.svg`, code: 'SOLANA_SOL' },
+  { id: 'USDC', name: 'USDC', icon: `${BASE}usdc.svg`, code: 'SOLANA_USDC' },
 ];
 
-const BUY_TOKENS = [
-  { id: 'USDC', name: 'USDC', icon: `${BASE}usdc.svg`, type: 'crypto', code: 'SOLANA_USDC' },
-  { id: 'EUR_SEPA', name: 'EUR (SEPA)', icon: `${BASE}eur.svg`, type: 'fiat', code: 'EUR', paymentMethod: 'EUR_SEPA' },
-  { id: 'EUR_CARD', name: 'EUR (Card)', icon: `${BASE}card.svg`, type: 'fiat', code: 'EUR', paymentMethod: 'CARD' },
-];
-
-// Country code (3-letter ISO)
-const COUNTRY_CODE = 'ESP';
-
-function TokenDropdown({ tokens, selected, onSelect }) {
+function TokenDropdown({ tokens, selected, onSelect, loading }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -33,6 +24,15 @@ function TokenDropdown({ tokens, selected, onSelect }) {
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 bg-[#2a2a3e] rounded-full px-3 py-2">
+        <div className="w-6 h-6 bg-gray-600 rounded-full animate-pulse"></div>
+        <span className="text-gray-400">Loading...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="relative" ref={ref}>
@@ -48,7 +48,7 @@ function TokenDropdown({ tokens, selected, onSelect }) {
       </button>
       
       {open && (
-        <div className="absolute right-0 top-full mt-2 bg-[#1a1a2e] border border-[#3a3a4e] rounded-xl overflow-hidden z-50 min-w-[160px] shadow-xl">
+        <div className="absolute right-0 top-full mt-2 bg-[#1a1a2e] border border-[#3a3a4e] rounded-xl overflow-hidden z-50 min-w-[180px] shadow-xl">
           {tokens.map((token) => (
             <button
               key={token.id}
@@ -76,28 +76,65 @@ export default function SwapCard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
-  const [sellToken, setSellToken] = useState(SELL_TOKENS[0]);
-  const [buyToken, setBuyToken] = useState(BUY_TOKENS[1]); // EUR SEPA default
+  // Detected country from API
+  const [countryCode, setCountryCode] = useState(null);
+  
+  // Dynamic buy tokens (fiat options from API)
+  const [buyTokens, setBuyTokens] = useState([]);
+  const [loadingBuyTokens, setLoadingBuyTokens] = useState(true);
+  
+  const [sellToken, setSellToken] = useState(SELL_TOKENS[1]); // USDC default
+  const [buyToken, setBuyToken] = useState(null);
   const [sellAmount, setSellAmount] = useState('');
   const [buyAmount, setBuyAmount] = useState('');
   const [bestPartner, setBestPartner] = useState(null);
-  
-  // Partners modal
-  const [showPartners, setShowPartners] = useState(false);
-  const [partners, setPartners] = useState([]);
 
-  // Auto-fetch best quote when amount/tokens change (for fiat only)
+  // Load payment methods on mount (API detects country from IP)
+  useEffect(() => {
+    const loadPaymentMethods = async () => {
+      setLoadingBuyTokens(true);
+      try {
+        const result = await getSupportedPaymentMethods({
+          rampType: 'OFFRAMP',
+          fromCurrency: sellToken.code,
+          toCurrency: 'EUR',
+        });
+        
+        // Store detected country
+        if (result.countryCode) {
+          setCountryCode(result.countryCode);
+        }
+        
+        // Convert payment methods to buy tokens (max 3)
+        const methods = (result.paymentMethods || []).slice(0, 3);
+        const tokens = methods.map((pm) => ({
+          id: pm.code,
+          name: pm.name,
+          icon: pm.icon,
+          code: 'EUR',
+          paymentMethod: pm.code,
+        }));
+        
+        setBuyTokens(tokens);
+        if (tokens.length > 0) {
+          setBuyToken(tokens[0]);
+        }
+      } catch (err) {
+        setError('Failed to load payment methods');
+        console.error(err);
+      } finally {
+        setLoadingBuyTokens(false);
+      }
+    };
+    
+    loadPaymentMethods();
+  }, [sellToken.code]);
+
+  // Auto-fetch best quote when amount/tokens change
   useEffect(() => {
     const fetchQuote = async () => {
-      if (!sellAmount || parseFloat(sellAmount) <= 0) {
+      if (!sellAmount || parseFloat(sellAmount) <= 0 || !buyToken || !countryCode) {
         setBuyAmount('');
-        setBestPartner(null);
-        return;
-      }
-
-      // Crypto to crypto - just show placeholder
-      if (buyToken.type !== 'fiat') {
-        setBuyAmount('~');
         setBestPartner(null);
         return;
       }
@@ -107,7 +144,7 @@ export default function SwapCard() {
 
       try {
         const result = await getAvailablePartners({
-          countryCode: COUNTRY_CODE,
+          countryCode,
           rampType: 'OFFRAMP',
           fromCurrency: sellToken.code,
           toCurrency: buyToken.code,
@@ -119,8 +156,6 @@ export default function SwapCard() {
         const sortedPartners = (result.partners || []).sort(
           (a, b) => parseFloat(b.toAmount || 0) - parseFloat(a.toAmount || 0)
         );
-        
-        setPartners(sortedPartners);
         
         if (sortedPartners.length > 0) {
           const best = sortedPartners[0];
@@ -141,18 +176,7 @@ export default function SwapCard() {
 
     const debounce = setTimeout(fetchQuote, 500);
     return () => clearTimeout(debounce);
-  }, [sellAmount, sellToken, buyToken]);
-
-  const handleSwapTokens = () => {
-    const newSell = SELL_TOKENS.find(t => t.id === buyToken.id);
-    const newBuy = BUY_TOKENS.find(t => t.id === sellToken.id);
-    if (newSell && newBuy) {
-      setSellToken(newSell);
-      setBuyToken(newBuy);
-      setSellAmount(buyAmount);
-      setBuyAmount(sellAmount);
-    }
-  };
+  }, [sellAmount, sellToken, buyToken, countryCode]);
 
   const handleSwap = async () => {
     if (!sellAmount || parseFloat(sellAmount) <= 0) return;
@@ -167,7 +191,7 @@ export default function SwapCard() {
     setLoading(true);
     try {
       const result = await createRedirectOrder({
-        countryCode: COUNTRY_CODE,
+        countryCode,
         rampType: 'OFFRAMP',
         fromCurrency: sellToken.code,
         toCurrency: buyToken.code,
@@ -183,17 +207,16 @@ export default function SwapCard() {
       setError(err.message);
     } finally {
       setLoading(false);
-      setShowPartners(false);
     }
   };
 
   const getButtonText = () => {
     if (loading) return 'Loading...';
     if (!sellAmount) return 'Enter amount';
-    if (buyToken.type === 'fiat' && bestPartner) {
+    if (bestPartner) {
       return `Withdraw via ${bestPartner.partnerName}`;
     }
-    return 'Connect Wallet';
+    return 'Get Quote';
   };
 
   return (
@@ -207,7 +230,7 @@ export default function SwapCard() {
           </svg>
         </button>
         <div className="bg-[#1a1a2e] rounded-full px-4 py-2 text-sm text-gray-300">
-          Slippage: Auto
+          {countryCode ? `🌍 ${countryCode}` : 'Detecting...'}
         </div>
       </div>
 
@@ -236,31 +259,37 @@ export default function SwapCard() {
           className="w-full bg-transparent text-4xl font-light outline-none text-white placeholder-gray-600 mb-2"
         />
         <div className="text-gray-500 text-sm">
-          {sellAmount ? `$${(parseFloat(sellAmount) * (sellToken.code === 'SOL' ? 150 : 1)).toFixed(2)}` : '$0.00'}
+          {sellAmount ? `$${(parseFloat(sellAmount) * (sellToken.code === 'SOLANA_SOL' ? 150 : 1)).toFixed(2)}` : '$0.00'}
         </div>
       </div>
 
-      {/* Swap Button */}
+      {/* Swap Arrow */}
       <div className="flex justify-center -my-3 relative z-10">
-        <button 
-          onClick={handleSwapTokens}
-          className="bg-[#1a1a2e] border border-[#2a2a3e] rounded-full p-2 hover:bg-[#2a2a3e] transition"
-        >
+        <div className="bg-[#1a1a2e] border border-[#2a2a3e] rounded-full p-2">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
           </svg>
-        </button>
+        </div>
       </div>
 
       {/* Buy Box */}
       <div className="bg-[#131320] rounded-2xl p-4 mb-4">
         <div className="flex justify-between items-center mb-3">
-          <span className="text-gray-400 text-sm">Buy</span>
-          <TokenDropdown 
-            tokens={BUY_TOKENS} 
-            selected={buyToken} 
-            onSelect={setBuyToken}
-          />
+          <span className="text-gray-400 text-sm">Receive</span>
+          {buyToken && (
+            <TokenDropdown 
+              tokens={buyTokens} 
+              selected={buyToken} 
+              onSelect={setBuyToken}
+              loading={loadingBuyTokens}
+            />
+          )}
+          {!buyToken && loadingBuyTokens && (
+            <div className="flex items-center gap-2 bg-[#2a2a3e] rounded-full px-3 py-2">
+              <div className="w-6 h-6 bg-gray-600 rounded-full animate-pulse"></div>
+              <span className="text-gray-400">Loading...</span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <div className={`text-4xl font-light ${buyAmount ? 'text-white' : 'text-gray-600'}`}>
@@ -275,7 +304,7 @@ export default function SwapCard() {
           )}
         </div>
         <div className="text-gray-500 text-sm">
-          {buyAmount && buyAmount !== '~' ? `$${parseFloat(buyAmount).toFixed(2)}` : '$0.00'}
+          {buyAmount ? `€${parseFloat(buyAmount).toFixed(2)}` : '€0.00'}
         </div>
       </div>
 
@@ -283,65 +312,17 @@ export default function SwapCard() {
       {bestPartner && sellAmount && (
         <div className="mb-4 px-2 text-sm text-gray-400 flex justify-between">
           <span>Best rate via {bestPartner.partnerName}</span>
-          <span>1 {sellToken.name} = {parseFloat(bestPartner.rate || 0).toFixed(4)} {buyToken.code}</span>
         </div>
       )}
 
       {/* CTA Button */}
       <button
         onClick={handleSwap}
-        disabled={loading || !sellAmount || (buyToken.type === 'fiat' && !bestPartner)}
+        disabled={loading || !sellAmount || !bestPartner}
         className="w-full bg-white text-black font-semibold rounded-2xl py-4 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
       >
         {getButtonText()}
       </button>
-
-      {/* Partners Modal */}
-      {showPartners && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1a1a2e] rounded-2xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold">Select Provider</h3>
-              <button onClick={() => setShowPartners(false)} className="text-gray-400 hover:text-white">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            
-            <div className="text-sm text-gray-400 mb-4">
-              {sellAmount} {sellToken.name} → {buyToken.name}
-            </div>
-
-            {partners.length === 0 ? (
-              <p className="text-gray-500 text-center py-4">No providers available</p>
-            ) : (
-              <div className="space-y-3">
-                {partners.map((partner, i) => (
-                  <button
-                    key={partner.partnerId}
-                    onClick={() => handleCreateOrder(partner)}
-                    className={`w-full rounded-xl p-4 flex items-center gap-4 transition text-left ${
-                      i === 0 
-                        ? 'bg-violet-600/20 border border-violet-500 hover:bg-violet-600/30' 
-                        : 'bg-[#131320] hover:bg-[#2a2a3e] border border-transparent'
-                    }`}
-                  >
-                    <img src={partner.icon} alt={partner.partnerName} className="w-10 h-10 rounded-lg" />
-                    <div className="flex-1">
-                      <div className="font-medium flex items-center gap-2">
-                        {partner.partnerName}
-                        {i === 0 && <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded">Best</span>}
-                      </div>
-                      <div className="text-green-400">{parseFloat(partner.toAmount || 0).toFixed(2)} {buyToken.code}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
