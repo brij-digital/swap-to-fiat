@@ -10,9 +10,7 @@ import {
 
 const STEPS = {
   INPUT: 'input',
-  PAYMENT_METHOD: 'payment_method',
   PARTNERS: 'partners',
-  CONFIRM: 'confirm',
 };
 
 export default function SwapCard() {
@@ -22,42 +20,89 @@ export default function SwapCard() {
   
   // Form state
   const [fromCurrency, setFromCurrency] = useState(CRYPTO_CURRENCIES[0]);
-  const [toCurrency, setToCurrency] = useState(FIAT_CURRENCIES[0]);
   const [amount, setAmount] = useState('50');
   const [country, setCountry] = useState(COUNTRIES[0]);
-  const [isFiatMode, setIsFiatMode] = useState(true);
   
-  // API results
-  const [paymentMethods, setPaymentMethods] = useState([]);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
+  // Destination mode: 'crypto' or 'fiat'
+  const [destMode, setDestMode] = useState('fiat');
+  
+  // For crypto mode
+  const [toCrypto, setToCrypto] = useState(CRYPTO_CURRENCIES[1]);
+  
+  // For fiat mode - combined fiat + payment method options
+  const [fiatOptions, setFiatOptions] = useState([]);
+  const [selectedFiatOption, setSelectedFiatOption] = useState(null);
+  const [loadingFiatOptions, setLoadingFiatOptions] = useState(false);
+  
+  // Partners
   const [partners, setPartners] = useState([]);
   const [selectedPartner, setSelectedPartner] = useState(null);
 
-  // Fetch payment methods when switching to fiat mode
-  const handleGetPaymentMethods = async () => {
-    setLoading(true);
+  // Fetch fiat options when mode changes to fiat or country/fromCurrency changes
+  useEffect(() => {
+    if (destMode === 'fiat') {
+      fetchAllFiatOptions();
+    }
+  }, [destMode, country, fromCurrency]);
+
+  // Fetch all fiat currencies with their payment methods
+  const fetchAllFiatOptions = async () => {
+    setLoadingFiatOptions(true);
     setError(null);
     
+    const allOptions = [];
+    
     try {
-      const result = await getSupportedPaymentMethods({
-        countryCode: country.code,
-        rampType: 'OFFRAMP',
-        fromCurrency: fromCurrency.code,
-        toCurrency: toCurrency.code,
-      });
+      // Fetch payment methods for each fiat currency
+      for (const fiat of FIAT_CURRENCIES) {
+        try {
+          const result = await getSupportedPaymentMethods({
+            countryCode: country.code,
+            rampType: 'OFFRAMP',
+            fromCurrency: fromCurrency.code,
+            toCurrency: fiat.code,
+          });
+          
+          if (result.paymentMethods && result.paymentMethods.length > 0) {
+            for (const method of result.paymentMethods) {
+              allOptions.push({
+                id: `${fiat.code}_${method.code}`,
+                fiat: fiat,
+                paymentMethod: method,
+                label: `${fiat.icon} ${fiat.code} via ${method.name}`,
+                icon: method.icon,
+                min: parseFloat(method.aggregatedLimit?.min || 0),
+                max: parseFloat(method.aggregatedLimit?.max || 0),
+              });
+            }
+          }
+        } catch (err) {
+          // Skip this fiat if not supported
+          console.log(`${fiat.code} not supported for this config`);
+        }
+      }
       
-      setPaymentMethods(result.paymentMethods || []);
-      setStep(STEPS.PAYMENT_METHOD);
+      setFiatOptions(allOptions);
+      if (allOptions.length > 0 && !selectedFiatOption) {
+        setSelectedFiatOption(allOptions[0]);
+      }
     } catch (err) {
-      setError(err.message);
+      setError('Failed to load fiat options');
     } finally {
-      setLoading(false);
+      setLoadingFiatOptions(false);
     }
   };
 
-  // Fetch partners for selected payment method
-  const handleGetPartners = async (method) => {
-    setSelectedPaymentMethod(method);
+  // Fetch partners for selected fiat option
+  const handleGetPartners = async () => {
+    if (!selectedFiatOption) return;
+    
+    const num = parseFloat(amount);
+    if (isNaN(num) || num <= 0) {
+      setError('Please enter a valid amount greater than 0');
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     
@@ -66,8 +111,8 @@ export default function SwapCard() {
         countryCode: country.code,
         rampType: 'OFFRAMP',
         fromCurrency: fromCurrency.code,
-        toCurrency: toCurrency.code,
-        paymentMethod: method.code,
+        toCurrency: selectedFiatOption.fiat.code,
+        paymentMethod: selectedFiatOption.paymentMethod.code,
         fromAmount: amount,
         partnerTypes: ['REDIRECT'],
       });
@@ -92,8 +137,8 @@ export default function SwapCard() {
         countryCode: country.code,
         rampType: 'OFFRAMP',
         fromCurrency: fromCurrency.code,
-        toCurrency: toCurrency.code,
-        paymentMethod: selectedPaymentMethod.code,
+        toCurrency: selectedFiatOption.fiat.code,
+        paymentMethod: selectedFiatOption.paymentMethod.code,
         fromAmount: amount,
         partnerId: partner.partnerId,
       });
@@ -109,19 +154,7 @@ export default function SwapCard() {
   };
 
   const handleBack = () => {
-    if (step === STEPS.PAYMENT_METHOD) setStep(STEPS.INPUT);
-    if (step === STEPS.PARTNERS) setStep(STEPS.PAYMENT_METHOD);
-    if (step === STEPS.CONFIRM) setStep(STEPS.PARTNERS);
-  };
-
-  const validateAmount = () => {
-    const num = parseFloat(amount);
-    if (isNaN(num) || num <= 0) {
-      setError('Please enter a valid amount greater than 0');
-      return false;
-    }
-    setError(null);
-    return true;
+    setStep(STEPS.INPUT);
   };
 
   return (
@@ -130,10 +163,8 @@ export default function SwapCard() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold">
-            {step === STEPS.INPUT && 'Swap to Fiat'}
-            {step === STEPS.PAYMENT_METHOD && 'Select Payment'}
+            {step === STEPS.INPUT && 'Swap'}
             {step === STEPS.PARTNERS && 'Select Provider'}
-            {step === STEPS.CONFIRM && 'Confirm'}
           </h2>
           {step !== STEPS.INPUT && (
             <button 
@@ -187,23 +218,93 @@ export default function SwapCard() {
               </div>
             </div>
 
-            {/* To (Fiat) */}
+            {/* To - Mode Selector */}
             <div className="bg-[#0d1117] rounded-xl p-4">
-              <label className="text-sm text-gray-400 mb-2 block">You receive (Fiat)</label>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 text-2xl font-semibold text-gray-500">
-                  ≈ Quote on next step
-                </div>
-                <select
-                  value={toCurrency.code}
-                  onChange={(e) => setToCurrency(FIAT_CURRENCIES.find(c => c.code === e.target.value))}
-                  className="bg-[#30363d] rounded-lg px-3 py-2 outline-none cursor-pointer"
+              <label className="text-sm text-gray-400 mb-2 block">You receive</label>
+              
+              {/* Crypto / Fiat Toggle */}
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={() => setDestMode('crypto')}
+                  className={`flex-1 py-2 px-4 rounded-lg font-medium transition ${
+                    destMode === 'crypto' 
+                      ? 'bg-violet-600 text-white' 
+                      : 'bg-[#30363d] text-gray-400 hover:text-white'
+                  }`}
                 >
-                  {FIAT_CURRENCIES.map(c => (
-                    <option key={c.code} value={c.code}>{c.icon} {c.code}</option>
-                  ))}
-                </select>
+                  🪙 Crypto
+                </button>
+                <button
+                  onClick={() => setDestMode('fiat')}
+                  className={`flex-1 py-2 px-4 rounded-lg font-medium transition ${
+                    destMode === 'fiat' 
+                      ? 'bg-violet-600 text-white' 
+                      : 'bg-[#30363d] text-gray-400 hover:text-white'
+                  }`}
+                >
+                  💵 Fiat
+                </button>
               </div>
+
+              {/* Crypto Mode */}
+              {destMode === 'crypto' && (
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 text-2xl font-semibold text-gray-500">
+                    Coming soon...
+                  </div>
+                  <select
+                    value={toCrypto.code}
+                    onChange={(e) => setToCrypto(CRYPTO_CURRENCIES.find(c => c.code === e.target.value))}
+                    className="bg-[#30363d] rounded-lg px-3 py-2 outline-none cursor-pointer"
+                    disabled
+                  >
+                    {CRYPTO_CURRENCIES.map(c => (
+                      <option key={c.code} value={c.code}>{c.icon} {c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Fiat Mode - Combined Currency + Payment Method */}
+              {destMode === 'fiat' && (
+                <div>
+                  {loadingFiatOptions ? (
+                    <div className="text-center py-4 text-gray-400">
+                      <div className="animate-spin inline-block w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full mr-2"></div>
+                      Loading options...
+                    </div>
+                  ) : fiatOptions.length === 0 ? (
+                    <div className="text-center py-4 text-gray-500">
+                      No fiat options available for this configuration
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {fiatOptions.map((option) => (
+                        <button
+                          key={option.id}
+                          onClick={() => setSelectedFiatOption(option)}
+                          className={`w-full p-3 rounded-lg flex items-center gap-3 transition text-left ${
+                            selectedFiatOption?.id === option.id
+                              ? 'bg-violet-600/20 border border-violet-500'
+                              : 'bg-[#1c2128] hover:bg-[#262c36] border border-transparent'
+                          }`}
+                        >
+                          <img src={option.icon} alt="" className="w-8 h-8 rounded" />
+                          <div className="flex-1">
+                            <div className="font-medium">{option.fiat.icon} {option.fiat.code}</div>
+                            <div className="text-xs text-gray-400">{option.paymentMethod.name}</div>
+                          </div>
+                          {selectedFiatOption?.id === option.id && (
+                            <svg className="w-5 h-5 text-violet-400" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Country */}
@@ -221,13 +322,24 @@ export default function SwapCard() {
             </div>
 
             {/* CTA */}
-            <button
-              onClick={() => validateAmount() && handleGetPaymentMethods()}
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 disabled:opacity-50 rounded-xl py-4 font-semibold transition"
-            >
-              {loading ? 'Loading...' : 'Continue to Payment Method'}
-            </button>
+            {destMode === 'fiat' && (
+              <button
+                onClick={handleGetPartners}
+                disabled={loading || !selectedFiatOption || loadingFiatOptions}
+                className="w-full bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 disabled:opacity-50 rounded-xl py-4 font-semibold transition"
+              >
+                {loading ? 'Loading...' : `Swap to ${selectedFiatOption?.fiat.code || 'Fiat'}`}
+              </button>
+            )}
+
+            {destMode === 'crypto' && (
+              <button
+                disabled
+                className="w-full bg-gray-600 opacity-50 rounded-xl py-4 font-semibold cursor-not-allowed"
+              >
+                Crypto swap coming soon
+              </button>
+            )}
 
             {/* Powered by */}
             <p className="text-center text-xs text-gray-500">
@@ -236,48 +348,20 @@ export default function SwapCard() {
           </div>
         )}
 
-        {/* Step: Payment Methods */}
-        {step === STEPS.PAYMENT_METHOD && (
-          <div className="space-y-3">
-            <p className="text-sm text-gray-400 mb-4">
-              Converting {amount} {fromCurrency.name} to {toCurrency.code}
-            </p>
-            
-            {paymentMethods.length === 0 ? (
-              <p className="text-gray-500 text-center py-4">No payment methods available</p>
-            ) : (
-              paymentMethods.map((method) => (
-                <button
-                  key={method.code}
-                  onClick={() => handleGetPartners(method)}
-                  disabled={loading}
-                  className="w-full bg-[#0d1117] hover:bg-[#1c2128] border border-[#30363d] rounded-xl p-4 flex items-center gap-4 transition text-left"
-                >
-                  <img src={method.icon} alt={method.name} className="w-10 h-10 rounded-lg" />
-                  <div className="flex-1">
-                    <div className="font-semibold">{method.name}</div>
-                    <div className="text-sm text-gray-400">
-                      Min: {parseFloat(method.aggregatedLimit?.min || 0).toFixed(2)} {fromCurrency.name}
-                    </div>
-                  </div>
-                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              ))
-            )}
-          </div>
-        )}
-
         {/* Step: Partners */}
         {step === STEPS.PARTNERS && (
           <div className="space-y-3">
-            <p className="text-sm text-gray-400 mb-4">
-              {amount} {fromCurrency.name} via {selectedPaymentMethod?.name}
-            </p>
+            <div className="bg-[#0d1117] rounded-lg p-3 mb-4">
+              <p className="text-sm text-gray-400">
+                Converting <span className="text-white font-medium">{amount} {fromCurrency.name}</span>
+              </p>
+              <p className="text-sm text-gray-400">
+                To <span className="text-white font-medium">{selectedFiatOption?.fiat.code}</span> via {selectedFiatOption?.paymentMethod.name}
+              </p>
+            </div>
             
             {partners.length === 0 ? (
-              <p className="text-gray-500 text-center py-4">No providers available</p>
+              <p className="text-gray-500 text-center py-4">No providers available for this amount</p>
             ) : (
               partners.map((partner) => (
                 <button
@@ -286,19 +370,22 @@ export default function SwapCard() {
                   disabled={loading}
                   className="w-full bg-[#0d1117] hover:bg-[#1c2128] border border-[#30363d] rounded-xl p-4 flex items-center gap-4 transition text-left"
                 >
-                  <img src={partner.icon} alt={partner.name} className="w-10 h-10 rounded-lg" />
+                  <img src={partner.icon} alt={partner.name} className="w-12 h-12 rounded-lg" />
                   <div className="flex-1">
                     <div className="font-semibold">{partner.name}</div>
-                    <div className="text-sm text-green-400">
-                      You get: {parseFloat(partner.toAmount || 0).toFixed(2)} {toCurrency.code}
+                    <div className="text-lg text-green-400 font-medium">
+                      {parseFloat(partner.toAmount || 0).toFixed(2)} {selectedFiatOption?.fiat.code}
                     </div>
                     <div className="text-xs text-gray-500">
-                      Rate: 1 {fromCurrency.name} = {parseFloat(partner.rate || 0).toFixed(4)} {toCurrency.code}
+                      Rate: 1 {fromCurrency.name} = {parseFloat(partner.rate || 0).toFixed(4)} {selectedFiatOption?.fiat.code}
                     </div>
                   </div>
-                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
+                  <div className="text-right">
+                    <div className="text-violet-400 text-sm">Select</div>
+                    <svg className="w-5 h-5 text-gray-400 ml-auto mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </div>
                 </button>
               ))
             )}
