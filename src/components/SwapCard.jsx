@@ -197,7 +197,7 @@ export default function SwapCard() {
     if (loading) return 'Loading...';
     if (!sellAmount) return 'Enter amount';
     if (buyToken.type === 'fiat' && bestPartner) {
-      return `Swap via ${bestPartner.name}`;
+      return `Withdraw via ${bestPartner.partnerName}`;
     }
     return 'Connect Wallet';
   };
@@ -277,7 +277,7 @@ export default function SwapCard() {
             )}
           </div>
           {bestPartner && (
-            <img src={bestPartner.icon} alt={bestPartner.name} className="w-6 h-6 rounded" title={`Best rate: ${bestPartner.name}`} />
+            <img src={bestPartner.icon} alt={bestPartner.partnerName} className="w-6 h-6 rounded" title={`Best rate: ${bestPartner.partnerName}`} />
           )}
         </div>
         <div className="text-gray-500 text-sm">
@@ -288,7 +288,7 @@ export default function SwapCard() {
       {/* Rate info */}
       {bestPartner && sellAmount && (
         <div className="mb-4 px-2 text-sm text-gray-400 flex justify-between">
-          <span>Best rate via {bestPartner.name}</span>
+          <span>Best rate via {bestPartner.partnerName}</span>
           <span>1 {sellToken.name} = {parseFloat(bestPartner.rate || 0).toFixed(4)} {buyToken.code}</span>
         </div>
       )}
@@ -333,10 +333,10 @@ export default function SwapCard() {
                         : 'bg-[#131320] hover:bg-[#2a2a3e] border border-transparent'
                     }`}
                   >
-                    <img src={partner.icon} alt={partner.name} className="w-10 h-10 rounded-lg" />
+                    <img src={partner.icon} alt={partner.partnerName} className="w-10 h-10 rounded-lg" />
                     <div className="flex-1">
                       <div className="font-medium flex items-center gap-2">
-                        {partner.name}
+                        {partner.partnerName}
                         {i === 0 && <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded">Best</span>}
                       </div>
                       <div className="text-green-400">{parseFloat(partner.toAmount || 0).toFixed(2)} {buyToken.code}</div>
