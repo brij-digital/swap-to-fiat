@@ -4,19 +4,21 @@ import {
   createRedirectOrder,
 } from '../services/brij';
 
+const BASE = import.meta.env.BASE_URL;
+
 // Token definitions with icons
 const SELL_TOKENS = [
-  { id: 'SOL', name: 'SOL', icon: '/sol.svg', type: 'crypto', code: 'SOL' },
-  { id: 'USDC', name: 'USDC', icon: '/usdc.svg', type: 'crypto', code: 'USDC' },
+  { id: 'SOL', name: 'SOL', icon: `${BASE}sol.svg`, type: 'crypto', code: 'SOL' },
+  { id: 'USDC', name: 'USDC', icon: `${BASE}usdc.svg`, type: 'crypto', code: 'USDC' },
 ];
 
 const BUY_TOKENS = [
-  { id: 'USDC', name: 'USDC', icon: '/usdc.svg', type: 'crypto', code: 'USDC' },
-  { id: 'EUR_SEPA', name: 'EUR (SEPA)', icon: '/eur.svg', type: 'fiat', code: 'EUR', paymentMethod: 'SEPA' },
-  { id: 'EUR_CARD', name: 'EUR (Card)', icon: '/card.svg', type: 'fiat', code: 'EUR', paymentMethod: 'CREDIT_CARD' },
+  { id: 'USDC', name: 'USDC', icon: `${BASE}usdc.svg`, type: 'crypto', code: 'USDC' },
+  { id: 'EUR_SEPA', name: 'EUR (SEPA)', icon: `${BASE}eur.svg`, type: 'fiat', code: 'EUR', paymentMethod: 'SEPA' },
+  { id: 'EUR_CARD', name: 'EUR (Card)', icon: `${BASE}card.svg`, type: 'fiat', code: 'EUR', paymentMethod: 'CREDIT_CARD' },
 ];
 
-function TokenDropdown({ tokens, selected, onSelect, label }) {
+function TokenDropdown({ tokens, selected, onSelect }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -34,7 +36,7 @@ function TokenDropdown({ tokens, selected, onSelect, label }) {
         onClick={() => setOpen(!open)}
         className="flex items-center gap-2 bg-[#2a2a3e] hover:bg-[#3a3a4e] rounded-full px-3 py-2 transition"
       >
-        <img src={selected.icon} alt={selected.name} className="w-6 h-6" />
+        <img src={selected.icon} alt={selected.name} className="w-6 h-6 rounded-full" />
         <span className="font-medium">{selected.name}</span>
         <svg className={`w-4 h-4 transition ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -51,7 +53,7 @@ function TokenDropdown({ tokens, selected, onSelect, label }) {
                 selected.id === token.id ? 'bg-[#2a2a3e]' : ''
               }`}
             >
-              <img src={token.icon} alt={token.name} className="w-6 h-6" />
+              <img src={token.icon} alt={token.name} className="w-6 h-6 rounded-full" />
               <span>{token.name}</span>
               {selected.id === token.id && (
                 <svg className="w-4 h-4 text-violet-400 ml-auto" fill="currentColor" viewBox="0 0 20 20">
@@ -74,16 +76,70 @@ export default function SwapCard() {
   const [buyToken, setBuyToken] = useState(BUY_TOKENS[1]); // EUR SEPA default
   const [sellAmount, setSellAmount] = useState('');
   const [buyAmount, setBuyAmount] = useState('');
+  const [bestPartner, setBestPartner] = useState(null);
   
   // Partners modal
   const [showPartners, setShowPartners] = useState(false);
   const [partners, setPartners] = useState([]);
 
-  const sellUsdValue = sellAmount ? `$${(parseFloat(sellAmount) * 150).toFixed(2)}` : '$0.00';
-  const buyUsdValue = buyAmount ? `$${parseFloat(buyAmount).toFixed(2)}` : '$0.00';
+  // Auto-fetch best quote when amount/tokens change (for fiat only)
+  useEffect(() => {
+    const fetchQuote = async () => {
+      if (!sellAmount || parseFloat(sellAmount) <= 0) {
+        setBuyAmount('');
+        setBestPartner(null);
+        return;
+      }
+
+      // Crypto to crypto - just show placeholder
+      if (buyToken.type !== 'fiat') {
+        setBuyAmount('~');
+        setBestPartner(null);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const result = await getAvailablePartners({
+          countryCode: 'ES',
+          rampType: 'OFFRAMP',
+          fromCurrency: sellToken.code,
+          toCurrency: buyToken.code,
+          paymentMethod: buyToken.paymentMethod,
+          fromAmount: sellAmount,
+          partnerTypes: ['REDIRECT'],
+        });
+
+        const sortedPartners = (result.partners || []).sort(
+          (a, b) => parseFloat(b.toAmount || 0) - parseFloat(a.toAmount || 0)
+        );
+        
+        setPartners(sortedPartners);
+        
+        if (sortedPartners.length > 0) {
+          const best = sortedPartners[0];
+          setBestPartner(best);
+          setBuyAmount(parseFloat(best.toAmount || 0).toFixed(2));
+        } else {
+          setBestPartner(null);
+          setBuyAmount('0.00');
+        }
+      } catch (err) {
+        setError(err.message);
+        setBestPartner(null);
+        setBuyAmount('');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const debounce = setTimeout(fetchQuote, 500);
+    return () => clearTimeout(debounce);
+  }, [sellAmount, sellToken, buyToken]);
 
   const handleSwapTokens = () => {
-    // Only swap if both tokens exist in both lists
     const newSell = SELL_TOKENS.find(t => t.id === buyToken.id);
     const newBuy = BUY_TOKENS.find(t => t.id === sellToken.id);
     if (newSell && newBuy) {
@@ -94,38 +150,18 @@ export default function SwapCard() {
     }
   };
 
-  const handleGetQuote = async () => {
+  const handleSwap = async () => {
     if (!sellAmount || parseFloat(sellAmount) <= 0) return;
-    
-    // Only works for crypto → fiat
-    if (buyToken.type !== 'fiat') {
-      setBuyAmount(sellAmount); // Mock 1:1 for demo
+
+    // Show partners modal if multiple options
+    if (partners.length > 1) {
+      setShowPartners(true);
       return;
     }
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const result = await getAvailablePartners({
-        countryCode: 'ES',
-        rampType: 'OFFRAMP',
-        fromCurrency: sellToken.code,
-        toCurrency: buyToken.code,
-        paymentMethod: buyToken.paymentMethod,
-        fromAmount: sellAmount,
-        partnerTypes: ['REDIRECT'],
-      });
-      
-      setPartners(result.partners || []);
-      if (result.partners?.length > 0) {
-        setBuyAmount(parseFloat(result.partners[0].toAmount || 0).toFixed(2));
-      }
-      setShowPartners(true);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+
+    // Direct redirect if only one partner
+    if (bestPartner) {
+      await handleCreateOrder(bestPartner);
     }
   };
 
@@ -151,6 +187,15 @@ export default function SwapCard() {
       setLoading(false);
       setShowPartners(false);
     }
+  };
+
+  const getButtonText = () => {
+    if (loading) return 'Loading...';
+    if (!sellAmount) return 'Enter amount';
+    if (buyToken.type === 'fiat' && bestPartner) {
+      return `Swap via ${bestPartner.name}`;
+    }
+    return 'Connect Wallet';
   };
 
   return (
@@ -192,7 +237,9 @@ export default function SwapCard() {
           placeholder="0.0"
           className="w-full bg-transparent text-4xl font-light outline-none text-white placeholder-gray-600 mb-2"
         />
-        <div className="text-gray-500 text-sm">{sellUsdValue}</div>
+        <div className="text-gray-500 text-sm">
+          {sellAmount ? `$${(parseFloat(sellAmount) * (sellToken.code === 'SOL' ? 150 : 1)).toFixed(2)}` : '$0.00'}
+        </div>
       </div>
 
       {/* Swap Button */}
@@ -217,19 +264,38 @@ export default function SwapCard() {
             onSelect={setBuyToken}
           />
         </div>
-        <div className="text-4xl font-light text-gray-500 mb-2">
-          {buyAmount || '0.0'}
+        <div className="flex items-center gap-2">
+          <div className={`text-4xl font-light ${buyAmount ? 'text-white' : 'text-gray-600'}`}>
+            {loading ? (
+              <span className="animate-pulse">...</span>
+            ) : (
+              buyAmount || '0.0'
+            )}
+          </div>
+          {bestPartner && (
+            <img src={bestPartner.icon} alt={bestPartner.name} className="w-6 h-6 rounded" title={`Best rate: ${bestPartner.name}`} />
+          )}
         </div>
-        <div className="text-gray-500 text-sm">{buyUsdValue}</div>
+        <div className="text-gray-500 text-sm">
+          {buyAmount && buyAmount !== '~' ? `$${parseFloat(buyAmount).toFixed(2)}` : '$0.00'}
+        </div>
       </div>
+
+      {/* Rate info */}
+      {bestPartner && sellAmount && (
+        <div className="mb-4 px-2 text-sm text-gray-400 flex justify-between">
+          <span>Best rate via {bestPartner.name}</span>
+          <span>1 {sellToken.name} = {parseFloat(bestPartner.rate || 0).toFixed(4)} {buyToken.code}</span>
+        </div>
+      )}
 
       {/* CTA Button */}
       <button
-        onClick={handleGetQuote}
-        disabled={loading || !sellAmount}
+        onClick={handleSwap}
+        disabled={loading || !sellAmount || (buyToken.type === 'fiat' && !bestPartner)}
         className="w-full bg-white text-black font-semibold rounded-2xl py-4 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
       >
-        {loading ? 'Loading...' : 'Connect Wallet'}
+        {getButtonText()}
       </button>
 
       {/* Partners Modal */}
@@ -253,15 +319,22 @@ export default function SwapCard() {
               <p className="text-gray-500 text-center py-4">No providers available</p>
             ) : (
               <div className="space-y-3">
-                {partners.map((partner) => (
+                {partners.map((partner, i) => (
                   <button
                     key={partner.partnerId}
                     onClick={() => handleCreateOrder(partner)}
-                    className="w-full bg-[#131320] hover:bg-[#2a2a3e] rounded-xl p-4 flex items-center gap-4 transition text-left"
+                    className={`w-full rounded-xl p-4 flex items-center gap-4 transition text-left ${
+                      i === 0 
+                        ? 'bg-violet-600/20 border border-violet-500 hover:bg-violet-600/30' 
+                        : 'bg-[#131320] hover:bg-[#2a2a3e] border border-transparent'
+                    }`}
                   >
                     <img src={partner.icon} alt={partner.name} className="w-10 h-10 rounded-lg" />
                     <div className="flex-1">
-                      <div className="font-medium">{partner.name}</div>
+                      <div className="font-medium flex items-center gap-2">
+                        {partner.name}
+                        {i === 0 && <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded">Best</span>}
+                      </div>
                       <div className="text-green-400">{parseFloat(partner.toAmount || 0).toFixed(2)} {buyToken.code}</div>
                     </div>
                   </button>
