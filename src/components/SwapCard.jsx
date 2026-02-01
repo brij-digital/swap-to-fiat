@@ -13,6 +13,11 @@ const SELL_TOKENS = [
   { id: 'USDC', name: 'USDC', icon: `${BASE}usdc.svg`, code: 'SOLANA_USDC' },
 ];
 
+// Hardcoded crypto buy options
+const CRYPTO_BUY_TOKENS = [
+  { id: 'USDC', name: 'USDC', icon: `${BASE}usdc.svg`, code: 'SOLANA_USDC', type: 'crypto' },
+];
+
 function TokenDropdown({ tokens, selected, onSelect, loading }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -107,17 +112,24 @@ export default function SwapCard() {
         
         // Convert payment methods to buy tokens (max 3)
         const methods = (result.paymentMethods || []).slice(0, 3);
-        const tokens = methods.map((pm) => ({
+        const fiatTokens = methods.map((pm) => ({
           id: pm.code,
-          name: pm.name,
+          name: `EUR ${pm.name}`,
           icon: pm.icon,
           code: 'EUR',
           paymentMethod: pm.code,
+          type: 'fiat',
         }));
         
-        setBuyTokens(tokens);
-        if (tokens.length > 0) {
-          setBuyToken(tokens[0]);
+        // Combine crypto + fiat options
+        const allTokens = [...CRYPTO_BUY_TOKENS, ...fiatTokens];
+        setBuyTokens(allTokens);
+        
+        // Default to first fiat option
+        if (fiatTokens.length > 0) {
+          setBuyToken(fiatTokens[0]);
+        } else if (allTokens.length > 0) {
+          setBuyToken(allTokens[0]);
         }
       } catch (err) {
         setError('Failed to load payment methods');
@@ -133,7 +145,21 @@ export default function SwapCard() {
   // Auto-fetch best quote when amount/tokens change
   useEffect(() => {
     const fetchQuote = async () => {
-      if (!sellAmount || parseFloat(sellAmount) <= 0 || !buyToken || !countryCode) {
+      if (!sellAmount || parseFloat(sellAmount) <= 0 || !buyToken) {
+        setBuyAmount('');
+        setBestPartner(null);
+        return;
+      }
+
+      // Crypto to crypto - no API call needed
+      if (buyToken.type === 'crypto') {
+        setBuyAmount(sellAmount);
+        setBestPartner(null);
+        return;
+      }
+
+      // Fiat - need country code
+      if (!countryCode) {
         setBuyAmount('');
         setBestPartner(null);
         return;
@@ -213,6 +239,7 @@ export default function SwapCard() {
   const getButtonText = () => {
     if (loading) return 'Loading...';
     if (!sellAmount) return 'Enter amount';
+    if (buyToken?.type === 'crypto') return 'Swap (Coming soon)';
     if (bestPartner) {
       return `Withdraw via ${bestPartner.partnerName}`;
     }
@@ -318,7 +345,7 @@ export default function SwapCard() {
       {/* CTA Button */}
       <button
         onClick={handleSwap}
-        disabled={loading || !sellAmount || !bestPartner}
+        disabled={loading || !sellAmount || !bestPartner || buyToken?.type === 'crypto'}
         className="w-full bg-white text-black font-semibold rounded-2xl py-4 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
       >
         {getButtonText()}
