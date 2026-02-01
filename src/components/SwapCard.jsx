@@ -16,6 +16,18 @@ const CURRENCY_SYMBOLS = {
   KRW: '₩', ARS: '$', COP: '$', CLP: '$', PEN: 'S/',
 };
 
+// ISO 3166-1 alpha-3 to alpha-2 mapping for flags
+const COUNTRY_CODE_MAP = {
+  ESP: 'es', FRA: 'fr', DEU: 'de', ITA: 'it', PRT: 'pt', NLD: 'nl', BEL: 'be',
+  AUT: 'at', IRL: 'ie', FIN: 'fi', GRC: 'gr', LUX: 'lu', SVN: 'si', SVK: 'sk',
+  EST: 'ee', LVA: 'lv', LTU: 'lt', MLT: 'mt', CYP: 'cy', GBR: 'gb', USA: 'us',
+  AUS: 'au', CAN: 'ca', CHE: 'ch', JPN: 'jp', CZE: 'cz', POL: 'pl', SWE: 'se',
+  NOR: 'no', DNK: 'dk', BRA: 'br', MEX: 'mx', IND: 'in', SGP: 'sg', HKG: 'hk',
+  NZL: 'nz', ZAF: 'za', THA: 'th', PHL: 'ph', IDN: 'id', MYS: 'my', VNM: 'vn',
+  TUR: 'tr', ISR: 'il', ARE: 'ae', SAU: 'sa', KOR: 'kr', ARG: 'ar', COL: 'co',
+  CHL: 'cl', PER: 'pe', RUS: 'ru', CHN: 'cn', TWN: 'tw',
+};
+
 // Sell tokens (crypto) - hardcoded
 const SELL_TOKENS = [
   { id: 'SOL', name: 'SOL', icon: `${BASE}sol.svg`, code: 'SOLANA_SOL' },
@@ -86,11 +98,10 @@ function TokenDropdown({ tokens, selected, onSelect, loading }) {
   );
 }
 
-// Generate currency icon dynamically
-function getCurrencyIcon(currencyCode) {
-  const symbol = CURRENCY_SYMBOLS[currencyCode] || currencyCode;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="32" fill="%23003399"/><text x="32" y="42" font-family="Arial" font-size="24" font-weight="bold" fill="%23FFCC00" text-anchor="middle">${encodeURIComponent(symbol)}</text></svg>`;
-  return `data:image/svg+xml,${svg}`;
+// Get flag icon URL from country code
+function getFlagIcon(countryCode3) {
+  const code2 = COUNTRY_CODE_MAP[countryCode3] || countryCode3.slice(0, 2).toLowerCase();
+  return `https://flagcdn.com/w80/${code2}.png`;
 }
 
 export default function SwapCard() {
@@ -131,12 +142,12 @@ export default function SwapCard() {
         
         // Convert payment methods to buy tokens (max 3)
         const methods = (result.paymentMethods || []).slice(0, 3);
-        const currencyIcon = getCurrencyIcon(currency);
+        const flagIcon = getFlagIcon(country);
         
         const fiatTokens = methods.map((pm) => ({
           id: `${currency}_${pm.code}`,
           name: `${currency} ${pm.name}`,
-          icon: currencyIcon,
+          icon: flagIcon,
           code: currency,
           paymentMethod: pm.code,
           type: 'fiat',
