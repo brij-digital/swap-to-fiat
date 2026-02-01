@@ -7,16 +7,20 @@ import {
 const BASE = import.meta.env.BASE_URL;
 
 // Token definitions with icons
+// API expects SOLANA_SOL, SOLANA_USDC format
 const SELL_TOKENS = [
-  { id: 'SOL', name: 'SOL', icon: `${BASE}sol.svg`, type: 'crypto', code: 'SOL' },
-  { id: 'USDC', name: 'USDC', icon: `${BASE}usdc.svg`, type: 'crypto', code: 'USDC' },
+  { id: 'SOL', name: 'SOL', icon: `${BASE}sol.svg`, type: 'crypto', code: 'SOLANA_SOL' },
+  { id: 'USDC', name: 'USDC', icon: `${BASE}usdc.svg`, type: 'crypto', code: 'SOLANA_USDC' },
 ];
 
 const BUY_TOKENS = [
-  { id: 'USDC', name: 'USDC', icon: `${BASE}usdc.svg`, type: 'crypto', code: 'USDC' },
+  { id: 'USDC', name: 'USDC', icon: `${BASE}usdc.svg`, type: 'crypto', code: 'SOLANA_USDC' },
   { id: 'EUR_SEPA', name: 'EUR (SEPA)', icon: `${BASE}eur.svg`, type: 'fiat', code: 'EUR', paymentMethod: 'SEPA' },
-  { id: 'EUR_CARD', name: 'EUR (Card)', icon: `${BASE}card.svg`, type: 'fiat', code: 'EUR', paymentMethod: 'CREDIT_CARD' },
+  { id: 'EUR_CARD', name: 'EUR (Card)', icon: `${BASE}card.svg`, type: 'fiat', code: 'EUR', paymentMethod: 'CARD' },
 ];
+
+// Country code (3-letter ISO)
+const COUNTRY_CODE = 'ESP';
 
 function TokenDropdown({ tokens, selected, onSelect }) {
   const [open, setOpen] = useState(false);
@@ -103,7 +107,7 @@ export default function SwapCard() {
 
       try {
         const result = await getAvailablePartners({
-          countryCode: 'ES',
+          countryCode: COUNTRY_CODE,
           rampType: 'OFFRAMP',
           fromCurrency: sellToken.code,
           toCurrency: buyToken.code,
@@ -169,7 +173,7 @@ export default function SwapCard() {
     setLoading(true);
     try {
       const result = await createRedirectOrder({
-        countryCode: 'ES',
+        countryCode: COUNTRY_CODE,
         rampType: 'OFFRAMP',
         fromCurrency: sellToken.code,
         toCurrency: buyToken.code,
