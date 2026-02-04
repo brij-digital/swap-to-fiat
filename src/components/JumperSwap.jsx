@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   getSupportedPaymentMethods,
   getAvailablePartners, 
@@ -70,72 +70,7 @@ const CURRENCY_SYMBOLS = {
   CZK: 'Kč', PLN: 'zł', SEK: 'kr', NOK: 'kr', DKK: 'kr', BRL: 'R$', MXN: '$',
 };
 
-// Chain Selector Modal
-function ChainSelectorModal({ isOpen, onClose, onSelect, selectedChain }) {
-  const [search, setSearch] = useState('');
-  
-  if (!isOpen) return null;
-  
-  const filteredChains = CHAINS.filter(c => 
-    c.name.toLowerCase().includes(search.toLowerCase())
-  );
-
-  return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#0d1117] border border-[#30363d] rounded-2xl w-full max-w-lg max-h-[80vh] overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-[#30363d]">
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
-            ←
-          </button>
-          <h2 className="text-lg font-semibold">Select a chain</h2>
-          <div className="w-6"></div>
-        </div>
-
-        {/* Search */}
-        <div className="p-4">
-          <div className="flex items-center bg-[#161b22] border border-[#30363d] rounded-xl px-4 py-3">
-            <input
-              type="text"
-              placeholder="Search by chain name"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="bg-transparent flex-1 outline-none text-white placeholder-gray-500"
-            />
-            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
-        </div>
-
-        {/* Chain Grid */}
-        <div className="p-4 pt-0 grid grid-cols-3 gap-2 max-h-[400px] overflow-y-auto">
-          {filteredChains.map((chain) => (
-            <button
-              key={chain.id}
-              onClick={() => { onSelect(chain); onClose(); }}
-              className={`flex items-center gap-2 p-3 rounded-xl border transition-all ${
-                selectedChain?.id === chain.id 
-                  ? 'border-blue-500 bg-blue-500/10' 
-                  : 'border-[#30363d] hover:border-[#50565d] bg-[#161b22]'
-              }`}
-              style={selectedChain?.id === chain.id ? { borderColor: chain.color } : {}}
-            >
-              {chain.isFiat ? (
-                <span className="text-xl">{chain.icon}</span>
-              ) : (
-                <img src={chain.icon} alt={chain.name} className="w-6 h-6 rounded-full" />
-              )}
-              <span className="text-sm font-medium truncate">{chain.name}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Combined Chain + Token Selector Modal (like Jumper)
+// Combined Chain + Token Selector Modal (Jumper-style)
 function CombinedSelectorModal({ 
   isOpen, 
   onClose, 
@@ -146,7 +81,6 @@ function CombinedSelectorModal({
   tokens, 
   selectedToken,
   loadingTokens,
-  title = "Select token"
 }) {
   const [search, setSearch] = useState('');
   const [view, setView] = useState('chains'); // 'chains' or 'tokens'
@@ -188,7 +122,7 @@ function CombinedSelectorModal({
         <div className="flex items-center justify-between p-4 border-b border-[#30363d]">
           <button 
             onClick={() => view === 'tokens' ? setView('chains') : onClose()} 
-            className="text-gray-400 hover:text-white"
+            className="text-gray-400 hover:text-white text-xl"
           >
             ←
           </button>
@@ -594,7 +528,6 @@ export default function JumperSwap() {
         tokens={CHAIN_TOKENS[payChain?.id] || []}
         selectedToken={payToken}
         onSelectToken={setPayToken}
-        title="Select token to pay"
       />
       
       <CombinedSelectorModal
@@ -614,7 +547,6 @@ export default function JumperSwap() {
         selectedToken={receiveToken}
         onSelectToken={setReceiveToken}
         loadingTokens={loadingFiat && receiveChain?.isFiat}
-        title="Select token to receive"
       />
     </div>
   );
