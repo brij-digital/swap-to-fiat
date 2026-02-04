@@ -135,27 +135,67 @@ function ChainSelectorModal({ isOpen, onClose, onSelect, selectedChain }) {
   );
 }
 
-// Token Selector Modal
-function TokenSelectorModal({ isOpen, onClose, onSelect, chain, tokens, selectedToken }) {
+// Combined Chain + Token Selector Modal (like Jumper)
+function CombinedSelectorModal({ 
+  isOpen, 
+  onClose, 
+  onSelectChain, 
+  onSelectToken, 
+  chains,
+  selectedChain, 
+  tokens, 
+  selectedToken,
+  loadingTokens,
+  title = "Select token"
+}) {
   const [search, setSearch] = useState('');
+  const [view, setView] = useState('chains'); // 'chains' or 'tokens'
+  
+  // Reset to chains view when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setView('chains');
+      setSearch('');
+    }
+  }, [isOpen]);
   
   if (!isOpen) return null;
+  
+  const filteredChains = chains.filter(c => 
+    c.name.toLowerCase().includes(search.toLowerCase())
+  );
   
   const filteredTokens = tokens.filter(t => 
     t.name.toLowerCase().includes(search.toLowerCase()) ||
     (t.fullName && t.fullName.toLowerCase().includes(search.toLowerCase()))
   );
 
+  const handleChainSelect = (chain) => {
+    onSelectChain(chain);
+    setView('tokens');
+    setSearch('');
+  };
+
+  const handleTokenSelect = (token) => {
+    onSelectToken(token);
+    onClose();
+  };
+
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="bg-[#0d1117] border border-[#30363d] rounded-2xl w-full max-w-lg max-h-[80vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-[#30363d]">
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
+          <button 
+            onClick={() => view === 'tokens' ? setView('chains') : onClose()} 
+            className="text-gray-400 hover:text-white"
+          >
             ←
           </button>
-          <h2 className="text-lg font-semibold">Select a token</h2>
-          <div className="w-6"></div>
+          <h2 className="text-lg font-semibold">
+            {view === 'chains' ? 'Select chain' : `Select token on ${selectedChain?.name}`}
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white">✕</button>
         </div>
 
         {/* Search */}
@@ -163,7 +203,7 @@ function TokenSelectorModal({ isOpen, onClose, onSelect, chain, tokens, selected
           <div className="flex items-center bg-[#161b22] border border-[#30363d] rounded-xl px-4 py-3">
             <input
               type="text"
-              placeholder="Search by name or paste address"
+              placeholder={view === 'chains' ? "Search chain..." : "Search token..."}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="bg-transparent flex-1 outline-none text-white placeholder-gray-500"
@@ -174,35 +214,70 @@ function TokenSelectorModal({ isOpen, onClose, onSelect, chain, tokens, selected
           </div>
         </div>
 
-        {/* Token List */}
-        <div className="max-h-[400px] overflow-y-auto">
-          {filteredTokens.map((token) => (
-            <button
-              key={token.id}
-              onClick={() => { onSelect(token); onClose(); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-[#161b22] transition text-left ${
-                selectedToken?.id === token.id ? 'bg-[#161b22]' : ''
-              }`}
-            >
-              {token.icon?.startsWith('http') || token.icon?.startsWith('/') ? (
-                <img src={token.icon} alt={token.name} className="w-10 h-10 rounded-full" />
-              ) : (
-                <span className="w-10 h-10 rounded-full bg-[#30363d] flex items-center justify-center text-lg">
-                  {token.icon}
-                </span>
-              )}
-              <div className="flex-1">
-                <div className="font-semibold">{token.name}</div>
-                <div className="text-sm text-gray-500">{token.fullName || token.name}</div>
+        {/* Chains View */}
+        {view === 'chains' && (
+          <div className="p-4 pt-0 grid grid-cols-3 gap-2 max-h-[400px] overflow-y-auto">
+            {filteredChains.map((chain) => (
+              <button
+                key={chain.id}
+                onClick={() => handleChainSelect(chain)}
+                className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-all ${
+                  selectedChain?.id === chain.id 
+                    ? 'border-blue-500 bg-blue-500/10' 
+                    : 'border-[#30363d] hover:border-[#50565d] bg-[#161b22]'
+                }`}
+                style={selectedChain?.id === chain.id ? { borderColor: chain.color } : {}}
+              >
+                {chain.isFiat ? (
+                  <span className="text-3xl">{chain.icon}</span>
+                ) : (
+                  <img src={chain.icon} alt={chain.name} className="w-10 h-10 rounded-full" />
+                )}
+                <span className="text-sm font-medium text-center">{chain.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Tokens View */}
+        {view === 'tokens' && (
+          <div className="max-h-[400px] overflow-y-auto">
+            {loadingTokens ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
               </div>
-              {selectedToken?.id === token.id && (
-                <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-              )}
-            </button>
-          ))}
-        </div>
+            ) : filteredTokens.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">No tokens available</div>
+            ) : (
+              filteredTokens.map((token) => (
+                <button
+                  key={token.id}
+                  onClick={() => handleTokenSelect(token)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-[#161b22] transition text-left ${
+                    selectedToken?.id === token.id ? 'bg-[#161b22]' : ''
+                  }`}
+                >
+                  {token.icon?.startsWith('http') || token.icon?.startsWith('/') ? (
+                    <img src={token.icon} alt={token.name} className="w-10 h-10 rounded-full" />
+                  ) : (
+                    <span className="w-10 h-10 rounded-full bg-[#30363d] flex items-center justify-center text-lg">
+                      {token.icon}
+                    </span>
+                  )}
+                  <div className="flex-1">
+                    <div className="font-semibold">{token.name}</div>
+                    <div className="text-sm text-gray-500">{token.fullName || token.name}</div>
+                  </div>
+                  {selectedToken?.id === token.id && (
+                    <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </button>
+              ))
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -221,11 +296,9 @@ export default function JumperSwap() {
   const [fiatTokens, setFiatTokens] = useState([]);
   const [loadingFiat, setLoadingFiat] = useState(false);
   
-  // Modal state
-  const [showPayChainModal, setShowPayChainModal] = useState(false);
-  const [showPayTokenModal, setShowPayTokenModal] = useState(false);
-  const [showReceiveChainModal, setShowReceiveChainModal] = useState(false);
-  const [showReceiveTokenModal, setShowReceiveTokenModal] = useState(false);
+  // Modal state (combined chain+token selectors)
+  const [showPaySelector, setShowPaySelector] = useState(false);
+  const [showReceiveSelector, setShowReceiveSelector] = useState(false);
   
   // Quote state
   const [bestPartner, setBestPartner] = useState(null);
@@ -389,21 +462,15 @@ export default function JumperSwap() {
             </div>
             <div className="flex items-center gap-3 bg-[#161b22] border border-[#30363d] rounded-xl p-3">
               <button 
-                onClick={() => setShowPayChainModal(true)}
-                className="flex items-center gap-2 hover:opacity-80"
+                onClick={() => setShowPaySelector(true)}
+                className="flex items-center gap-2 hover:opacity-80 bg-[#0d1117] px-3 py-1.5 rounded-lg border border-[#30363d]"
               >
                 <img src={payChain?.icon} alt={payChain?.name} className="w-6 h-6 rounded-full" />
-              </button>
-              <button
-                onClick={() => setShowPayTokenModal(true)}
-                className="flex items-center gap-2 hover:opacity-80"
-              >
                 <span className="font-semibold">{payToken?.name}</span>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
-              <div className="h-6 w-px bg-[#30363d]"></div>
               <input
                 type="number"
                 value={payAmount}
@@ -433,37 +500,26 @@ export default function JumperSwap() {
             </div>
             <div className="flex items-center gap-3 bg-[#161b22] border border-[#30363d] rounded-xl p-3">
               <button 
-                onClick={() => setShowReceiveChainModal(true)}
-                className="flex items-center gap-2 hover:opacity-80"
+                onClick={() => setShowReceiveSelector(true)}
+                className="flex items-center gap-2 hover:opacity-80 bg-[#0d1117] px-3 py-1.5 rounded-lg border border-[#30363d]"
+                disabled={loadingFiat}
               >
                 {receiveChain?.isFiat ? (
                   <span className="text-xl">{receiveChain?.icon}</span>
                 ) : (
                   <img src={receiveChain?.icon} alt={receiveChain?.name} className="w-6 h-6 rounded-full" />
                 )}
-              </button>
-              <button
-                onClick={() => setShowReceiveTokenModal(true)}
-                className="flex items-center gap-2 hover:opacity-80"
-                disabled={loadingFiat}
-              >
                 {loadingFiat ? (
                   <span className="text-gray-400">Loading...</span>
                 ) : receiveToken ? (
-                  <>
-                    {receiveToken.icon && (
-                      <img src={receiveToken.icon} alt="" className="w-5 h-5 rounded" />
-                    )}
-                    <span className="font-semibold">{receiveToken.name}</span>
-                  </>
+                  <span className="font-semibold">{receiveToken.name}</span>
                 ) : (
                   <span className="text-gray-400">Select</span>
                 )}
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
-              <div className="h-6 w-px bg-[#30363d]"></div>
               <div className="flex-1 text-xl font-light text-right">
                 {loading ? (
                   <span className="animate-pulse text-gray-500">...</span>
@@ -525,32 +581,28 @@ export default function JumperSwap() {
         </div>
       </div>
 
-      {/* Modals */}
-      <ChainSelectorModal
-        isOpen={showPayChainModal}
-        onClose={() => setShowPayChainModal(false)}
-        onSelect={(chain) => {
-          if (!chain.isFiat) {
-            setPayChain(chain);
-            setPayToken(CHAIN_TOKENS[chain.id]?.[0] || null);
-          }
-        }}
+      {/* Combined Chain + Token Selector Modals */}
+      <CombinedSelectorModal
+        isOpen={showPaySelector}
+        onClose={() => setShowPaySelector(false)}
+        chains={CHAINS.filter(c => !c.isFiat)} // Pay side: only crypto chains
         selectedChain={payChain}
-      />
-      
-      <TokenSelectorModal
-        isOpen={showPayTokenModal}
-        onClose={() => setShowPayTokenModal(false)}
-        onSelect={setPayToken}
-        chain={payChain}
+        onSelectChain={(chain) => {
+          setPayChain(chain);
+          setPayToken(CHAIN_TOKENS[chain.id]?.[0] || null);
+        }}
         tokens={CHAIN_TOKENS[payChain?.id] || []}
         selectedToken={payToken}
+        onSelectToken={setPayToken}
+        title="Select token to pay"
       />
       
-      <ChainSelectorModal
-        isOpen={showReceiveChainModal}
-        onClose={() => setShowReceiveChainModal(false)}
-        onSelect={(chain) => {
+      <CombinedSelectorModal
+        isOpen={showReceiveSelector}
+        onClose={() => setShowReceiveSelector(false)}
+        chains={CHAINS} // Receive side: all chains including fiat
+        selectedChain={receiveChain}
+        onSelectChain={(chain) => {
           setReceiveChain(chain);
           if (!chain.isFiat) {
             setReceiveToken(CHAIN_TOKENS[chain.id]?.[0] || null);
@@ -558,16 +610,11 @@ export default function JumperSwap() {
             setReceiveToken(fiatTokens[0] || null);
           }
         }}
-        selectedChain={receiveChain}
-      />
-      
-      <TokenSelectorModal
-        isOpen={showReceiveTokenModal}
-        onClose={() => setShowReceiveTokenModal(false)}
-        onSelect={setReceiveToken}
-        chain={receiveChain}
         tokens={getReceiveTokens()}
         selectedToken={receiveToken}
+        onSelectToken={setReceiveToken}
+        loadingTokens={loadingFiat && receiveChain?.isFiat}
+        title="Select token to receive"
       />
     </div>
   );
