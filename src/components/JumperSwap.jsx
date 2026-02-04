@@ -7,8 +7,9 @@ import {
 
 const BASE = import.meta.env.BASE_URL;
 
-// Chains data with icons
+// Chains data with icons (Fiat first for receive side)
 const CHAINS = [
+  { id: 'fiat', name: 'Fiat Currencies', icon: '💵', color: '#22C55E', isFiat: true },
   { id: 'ethereum', name: 'Ethereum', icon: 'https://cryptologos.cc/logos/ethereum-eth-logo.svg', color: '#627EEA' },
   { id: 'solana', name: 'Solana', icon: `${BASE}sol.svg`, color: '#9945FF' },
   { id: 'polygon', name: 'Polygon', icon: 'https://cryptologos.cc/logos/polygon-matic-logo.svg', color: '#8247E5' },
@@ -17,7 +18,6 @@ const CHAINS = [
   { id: 'base', name: 'Base', icon: 'https://avatars.githubusercontent.com/u/108554348', color: '#0052FF' },
   { id: 'avalanche', name: 'Avalanche', icon: 'https://cryptologos.cc/logos/avalanche-avax-logo.svg', color: '#E84142' },
   { id: 'bnb', name: 'BNB Chain', icon: 'https://cryptologos.cc/logos/bnb-bnb-logo.svg', color: '#F3BA2F' },
-  { id: 'fiat', name: 'Fiat Currencies', icon: '💵', color: '#22C55E', isFiat: true },
 ];
 
 // Tokens per chain
