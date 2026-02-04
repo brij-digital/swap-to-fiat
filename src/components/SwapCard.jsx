@@ -39,9 +39,15 @@ const CRYPTO_BUY_TOKENS = [
   { id: 'USDC', name: 'USDC', icon: `${BASE}usdc.svg`, code: 'SOLANA_USDC', type: 'crypto' },
 ];
 
-function TokenDropdown({ tokens, selected, onSelect, loading }) {
+function TokenDropdown({ tokens, selected, onSelect, loading, showTabs = false }) {
   const [open, setOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('fiat'); // 'crypto' or 'fiat'
   const ref = useRef(null);
+
+  // Separate tokens by type
+  const cryptoTokens = tokens.filter(t => t.type === 'crypto');
+  const fiatTokens = tokens.filter(t => t.type === 'fiat');
+  const hasBothTypes = cryptoTokens.length > 0 && fiatTokens.length > 0;
 
   useEffect(() => {
     const handleClick = (e) => {
@@ -51,6 +57,13 @@ function TokenDropdown({ tokens, selected, onSelect, loading }) {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
+  // Set active tab based on selected token when opening
+  useEffect(() => {
+    if (open && selected) {
+      setActiveTab(selected.type === 'crypto' ? 'crypto' : 'fiat');
+    }
+  }, [open, selected]);
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 bg-[#2a2a3e] rounded-full px-3 py-2">
@@ -59,6 +72,10 @@ function TokenDropdown({ tokens, selected, onSelect, loading }) {
       </div>
     );
   }
+
+  const displayTokens = showTabs && hasBothTypes 
+    ? (activeTab === 'crypto' ? cryptoTokens : fiatTokens)
+    : tokens;
 
   return (
     <div className="relative" ref={ref}>
@@ -74,24 +91,60 @@ function TokenDropdown({ tokens, selected, onSelect, loading }) {
       </button>
       
       {open && (
-        <div className="absolute right-0 top-full mt-2 bg-[#1a1a2e] border border-[#3a3a4e] rounded-xl overflow-hidden z-50 min-w-[200px] shadow-xl">
-          {tokens.map((token) => (
-            <button
-              key={token.id}
-              onClick={() => { onSelect(token); setOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-[#2a2a3e] transition text-left ${
-                selected.id === token.id ? 'bg-[#2a2a3e]' : ''
-              }`}
-            >
-              <img src={token.icon} alt={token.name} className="w-6 h-6 rounded-full" />
-              <span className="truncate">{token.name}</span>
-              {selected.id === token.id && (
-                <svg className="w-4 h-4 text-violet-400 ml-auto flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-              )}
-            </button>
-          ))}
+        <div className="absolute right-0 top-full mt-2 bg-[#1a1a2e] border border-[#3a3a4e] rounded-xl overflow-hidden z-50 min-w-[240px] shadow-xl">
+          {/* Tabs - only show if both types exist and showTabs is true */}
+          {showTabs && hasBothTypes && (
+            <div className="p-2">
+              <div className="flex bg-[#0d0d1a] rounded-full p-1">
+                <button
+                  onClick={() => setActiveTab('crypto')}
+                  className={`flex-1 py-2 px-4 rounded-full text-sm font-medium transition ${
+                    activeTab === 'crypto' 
+                      ? 'bg-white text-black' 
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Crypto
+                </button>
+                <button
+                  onClick={() => setActiveTab('fiat')}
+                  className={`flex-1 py-2 px-4 rounded-full text-sm font-medium transition ${
+                    activeTab === 'fiat' 
+                      ? 'bg-white text-black' 
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Fiat
+                </button>
+              </div>
+            </div>
+          )}
+          
+          {/* Token list */}
+          <div className="max-h-[300px] overflow-y-auto">
+            {displayTokens.map((token) => (
+              <button
+                key={token.id}
+                onClick={() => { onSelect(token); setOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-[#2a2a3e] transition text-left ${
+                  selected.id === token.id ? 'bg-[#2a2a3e]' : ''
+                }`}
+              >
+                <img src={token.icon} alt={token.name} className="w-6 h-6 rounded-full" />
+                <div className="flex flex-col flex-1 min-w-0">
+                  <span className="truncate font-medium">{token.name}</span>
+                  {token.type === 'fiat' && token.paymentMethod && (
+                    <span className="text-xs text-gray-500 truncate">{token.paymentMethod}</span>
+                  )}
+                </div>
+                {selected.id === token.id && (
+                  <svg className="w-4 h-4 text-violet-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -341,6 +394,7 @@ export default function SwapCard() {
               selected={buyToken} 
               onSelect={setBuyToken}
               loading={loadingBuyTokens}
+              showTabs={true}
             />
           )}
           {!buyToken && loadingBuyTokens && (
