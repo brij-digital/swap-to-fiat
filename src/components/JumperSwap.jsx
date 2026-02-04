@@ -446,7 +446,12 @@ export default function JumperSwap() {
                 {loadingFiat ? (
                   <span className="text-gray-400">Loading...</span>
                 ) : receiveToken ? (
-                  <span className="font-semibold">{receiveToken.name}</span>
+                  <div className="flex flex-col items-start">
+                    <span className="font-semibold">{receiveToken.name}</span>
+                    {receiveToken.type === 'fiat' && receiveToken.fullName && (
+                      <span className="text-xs text-gray-500">{receiveToken.fullName.replace(`${receiveToken.name} via `, '')}</span>
+                    )}
+                  </div>
                 ) : (
                   <span className="text-gray-400">Select</span>
                 )}
