@@ -76,7 +76,6 @@ function TokenSelectorModal({
   loading,
   onClose,
   onSelect,
-  selectableTokenIds,
 }) {
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('crypto');
@@ -131,21 +130,12 @@ function TokenSelectorModal({
     <button
       key={token.id}
       type="button"
-      disabled={!selectableTokenIds.has(token.id)}
       onClick={() => {
-        if (!selectableTokenIds.has(token.id)) {
-          return;
-        }
-
         onSelect(token);
         onClose();
       }}
       className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition ${
-        !selectableTokenIds.has(token.id)
-          ? 'cursor-not-allowed opacity-55'
-          : selected?.id === token.id
-            ? 'bg-[#16304d]'
-            : 'hover:bg-[#12243a]'
+        selected?.id === token.id ? 'bg-[#16304d]' : 'hover:bg-[#12243a]'
       }`}
     >
       <img src={token.icon} alt={token.name} className="h-10 w-10 rounded-full object-cover" />
@@ -153,10 +143,9 @@ function TokenSelectorModal({
         <div className="truncate font-semibold text-slate-50">{token.name}</div>
         <div className="truncate text-sm text-slate-500">
           {token.subtitle || (token.type === 'fiat' ? 'Fiat rail' : 'Crypto asset')}
-          {!selectableTokenIds.has(token.id) ? ' • Preview only' : ''}
         </div>
       </div>
-      {selected?.id === token.id && selectableTokenIds.has(token.id) && (
+      {selected?.id === token.id && (
         <svg className="h-5 w-5 flex-shrink-0 text-cyan-300" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
         </svg>
@@ -296,9 +285,6 @@ function formatFiatValue(value, currency) {
 }
 
 export default function SwapCard() {
-  const [rampMode, setRampMode] = useState('OFFRAMP');
-  const isOnRamp = rampMode === 'ONRAMP';
-  const modeLabel = isOnRamp ? 'On-ramp' : 'Off-ramp';
   const [activeSelector, setActiveSelector] = useState(null);
 
   const [loading, setLoading] = useState(false);
@@ -306,10 +292,10 @@ export default function SwapCard() {
   const [countryCode, setCountryCode] = useState(null);
   const [detectedCurrency, setDetectedCurrency] = useState(null);
 
-  const [payTokens, setPayTokens] = useState(CRYPTO_TOKENS);
-  const [receiveTokens, setReceiveTokens] = useState([]);
-  const [loadingPayTokens, setLoadingPayTokens] = useState(false);
-  const [loadingReceiveTokens, setLoadingReceiveTokens] = useState(true);
+  const [payFiatTokens, setPayFiatTokens] = useState([]);
+  const [receiveFiatTokens, setReceiveFiatTokens] = useState([]);
+  const [loadingPayFiatTokens, setLoadingPayFiatTokens] = useState(true);
+  const [loadingReceiveFiatTokens, setLoadingReceiveFiatTokens] = useState(true);
 
   const [payToken, setPayToken] = useState(CRYPTO_TOKENS[1]);
   const [receiveToken, setReceiveToken] = useState(null);
@@ -319,28 +305,29 @@ export default function SwapCard() {
 
   const selectedCryptoPayToken = CRYPTO_TOKENS.find((token) => token.code === payToken?.code) || CRYPTO_TOKENS[1];
   const selectedCryptoReceiveToken = CRYPTO_TOKENS.find((token) => token.code === receiveToken?.code) || CRYPTO_TOKENS[1];
-
-  const toggleRampMode = () => {
-    setActiveSelector(null);
-    setRampMode((currentMode) => (currentMode === 'ONRAMP' ? 'OFFRAMP' : 'ONRAMP'));
-  };
-
-  const paySelectorTokens = isOnRamp ? payTokens : CRYPTO_TOKENS;
-  const paySelectorSelected = isOnRamp ? payToken : selectedCryptoPayToken;
-  const paySelectorLoading = isOnRamp ? loadingPayTokens : false;
-
-  const receiveSelectorTokens = isOnRamp ? CRYPTO_TOKENS : receiveTokens;
-  const receiveSelectorSelected = isOnRamp ? selectedCryptoReceiveToken : receiveToken;
-  const receiveSelectorLoading = isOnRamp ? false : loadingReceiveTokens;
-  const modalTokens = mergeUniqueTokens(CRYPTO_TOKENS, payTokens, receiveTokens);
+  const modalTokens = mergeUniqueTokens(CRYPTO_TOKENS, payFiatTokens, receiveFiatTokens);
 
   const selectorTitle = activeSelector === 'pay' ? 'Select asset you pay with' : 'Select asset you receive';
   const selectorTokens = modalTokens;
-  const selectorSelected = activeSelector === 'pay' ? paySelectorSelected : receiveSelectorSelected;
-  const selectorLoading = activeSelector === 'pay' ? paySelectorLoading : receiveSelectorLoading;
-  const selectorSelectableTokenIds = new Set(
-    (activeSelector === 'pay' ? paySelectorTokens : receiveSelectorTokens).map((token) => token.id),
-  );
+  const selectorSelected = activeSelector === 'pay' ? payToken : receiveToken;
+  const selectorLoading = false;
+
+  const payType = payToken?.type || null;
+  const receiveType = receiveToken?.type || null;
+  const isOnRampFlow = payType === 'fiat' && receiveType === 'crypto';
+  const isOffRampFlow = payType === 'crypto' && receiveType === 'fiat';
+  const isCryptoToCryptoFlow = payType === 'crypto' && receiveType === 'crypto';
+  const isFiatToFiatFlow = payType === 'fiat' && receiveType === 'fiat';
+  const isActionableFlow = isOnRampFlow || isOffRampFlow;
+  const modeLabel = isOnRampFlow
+    ? 'Fiat -> Crypto'
+    : isOffRampFlow
+      ? 'Crypto -> Fiat'
+      : isCryptoToCryptoFlow
+        ? 'Crypto -> Crypto'
+        : isFiatToFiatFlow
+          ? 'Fiat -> Fiat'
+          : 'Select pair';
 
   const handleSelectToken = (token) => {
     if (activeSelector === 'pay') {
@@ -352,108 +339,129 @@ export default function SwapCard() {
   };
 
   useEffect(() => {
-    setError(null);
-    setLoading(false);
-    setBestPartner(null);
-    setPayAmount('');
-    setReceiveAmount('');
-
-    if (isOnRamp) {
-      setReceiveTokens(CRYPTO_TOKENS);
-      setReceiveToken(selectedCryptoReceiveToken);
-      setPayTokens([]);
-      setPayToken(null);
-      setLoadingPayTokens(true);
-      setLoadingReceiveTokens(false);
-    } else {
-      setPayTokens(CRYPTO_TOKENS);
-      setPayToken(selectedCryptoPayToken);
-      setReceiveTokens([]);
-      setReceiveToken(null);
-      setLoadingPayTokens(false);
-      setLoadingReceiveTokens(true);
-    }
-  }, [isOnRamp, selectedCryptoPayToken, selectedCryptoReceiveToken]);
-
-  useEffect(() => {
     let ignore = false;
 
-    const loadOptions = async () => {
+    const loadPayFiatOptions = async () => {
       try {
-        setError(null);
+        setLoadingPayFiatTokens(true);
 
-        if (isOnRamp) {
-          const targetToken = selectedCryptoReceiveToken;
-          const result = await getSupportedPaymentMethods({
-            rampType: 'ONRAMP',
-            toCurrency: targetToken.code,
-          });
+        const result = await getSupportedPaymentMethods({
+          rampType: 'ONRAMP',
+          toCurrency: selectedCryptoReceiveToken.code,
+        });
 
-          if (ignore) {
-            return;
-          }
-
-          const fiatOptions = createFiatOptions(
-            result.fromCurrency,
-            (result.paymentMethods || []).slice(0, 4),
-            result.countryCode,
-          );
-
-          setCountryCode(result.countryCode);
-          setDetectedCurrency(result.fromCurrency);
-          setPayTokens(fiatOptions);
-          setPayToken((current) => fiatOptions.find((option) => option.id === current?.id) || fiatOptions[0] || null);
-        } else {
-          const sourceToken = selectedCryptoPayToken;
-          const result = await getSupportedPaymentMethods({
-            rampType: 'OFFRAMP',
-            fromCurrency: sourceToken.code,
-          });
-
-          if (ignore) {
-            return;
-          }
-
-          const fiatOptions = createFiatOptions(
-            result.toCurrency,
-            (result.paymentMethods || []).slice(0, 4),
-            result.countryCode,
-          );
-
-          setCountryCode(result.countryCode);
-          setDetectedCurrency(result.toCurrency);
-          setReceiveTokens(fiatOptions);
-          setReceiveToken((current) => fiatOptions.find((option) => option.id === current?.id) || fiatOptions[0] || null);
+        if (ignore) {
+          return;
         }
+
+        const fiatOptions = createFiatOptions(
+          result.fromCurrency,
+          (result.paymentMethods || []).slice(0, 4),
+          result.countryCode,
+        );
+
+        setCountryCode(result.countryCode);
+        setDetectedCurrency((current) => current || result.fromCurrency);
+        setPayFiatTokens(fiatOptions);
+        setPayToken((current) => {
+          if (!current) {
+            return current;
+          }
+
+          if (current.type !== 'fiat') {
+            return current;
+          }
+
+          return fiatOptions.find((option) => option.id === current.id) || fiatOptions[0] || current;
+        });
       } catch (err) {
         if (!ignore) {
-          setError('Failed to load payment methods');
+          setError('Failed to load fiat payment methods');
         }
       } finally {
         if (!ignore) {
-          if (isOnRamp) {
-            setLoadingPayTokens(false);
-          } else {
-            setLoadingReceiveTokens(false);
-          }
+          setLoadingPayFiatTokens(false);
         }
       }
     };
 
-    if (isOnRamp || selectedCryptoPayToken) {
-      loadOptions();
-    }
+    loadPayFiatOptions();
 
     return () => {
       ignore = true;
     };
-  }, [isOnRamp, selectedCryptoPayToken, selectedCryptoReceiveToken]);
+  }, [selectedCryptoReceiveToken]);
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadReceiveFiatOptions = async () => {
+      try {
+        setLoadingReceiveFiatTokens(true);
+
+        const result = await getSupportedPaymentMethods({
+          rampType: 'OFFRAMP',
+          fromCurrency: selectedCryptoPayToken.code,
+        });
+
+        if (ignore) {
+          return;
+        }
+
+        const fiatOptions = createFiatOptions(
+          result.toCurrency,
+          (result.paymentMethods || []).slice(0, 4),
+          result.countryCode,
+        );
+
+        setCountryCode(result.countryCode);
+        setDetectedCurrency(result.toCurrency);
+        setReceiveFiatTokens(fiatOptions);
+        setReceiveToken((current) => {
+          if (!current) {
+            return fiatOptions[0] || null;
+          }
+
+          if (current.type !== 'fiat') {
+            return current;
+          }
+
+          return fiatOptions.find((option) => option.id === current.id) || fiatOptions[0] || current;
+        });
+      } catch (err) {
+        if (!ignore) {
+          setError('Failed to load fiat payout methods');
+        }
+      } finally {
+        if (!ignore) {
+          setLoadingReceiveFiatTokens(false);
+        }
+      }
+    };
+
+    loadReceiveFiatOptions();
+
+    return () => {
+      ignore = true;
+    };
+  }, [selectedCryptoPayToken]);
+
+  useEffect(() => {
+    if (payToken?.type === 'fiat') {
+      setDetectedCurrency(payToken.code);
+      return;
+    }
+
+    if (receiveToken?.type === 'fiat') {
+      setDetectedCurrency(receiveToken.code);
+    }
+  }, [payToken, receiveToken]);
 
   useEffect(() => {
     let ignore = false;
 
     const fetchQuote = async () => {
-      if (!payAmount || Number.parseFloat(payAmount) <= 0 || !payToken || !receiveToken || !countryCode) {
+      if (!payAmount || Number.parseFloat(payAmount) <= 0 || !payToken || !receiveToken || !countryCode || !isActionableFlow) {
         setReceiveAmount('');
         setBestPartner(null);
         return;
@@ -465,10 +473,10 @@ export default function SwapCard() {
       try {
         const result = await getAvailablePartners({
           countryCode,
-          rampType: rampMode,
-          fromCurrency: isOnRamp ? payToken.code : selectedCryptoPayToken.code,
-          toCurrency: isOnRamp ? selectedCryptoReceiveToken.code : receiveToken.code,
-          paymentMethod: isOnRamp ? payToken.paymentMethod : receiveToken.paymentMethod,
+          rampType: isOnRampFlow ? 'ONRAMP' : 'OFFRAMP',
+          fromCurrency: payToken.code,
+          toCurrency: receiveToken.code,
+          paymentMethod: isOnRampFlow ? payToken.paymentMethod : receiveToken.paymentMethod,
           fromAmount: payAmount,
           partnerTypes: ['REDIRECT'],
         });
@@ -488,10 +496,9 @@ export default function SwapCard() {
         }
 
         const best = sortedPartners[0];
-        const outputToken = isOnRamp ? selectedCryptoReceiveToken : receiveToken;
 
         setBestPartner(best);
-        setReceiveAmount(formatTokenAmount(best.toAmount, outputToken));
+        setReceiveAmount(formatTokenAmount(best.toAmount, receiveToken));
       } catch (err) {
         if (!ignore) {
           setError(err.message);
@@ -512,25 +519,27 @@ export default function SwapCard() {
     };
   }, [
     countryCode,
-    isOnRamp,
+    isActionableFlow,
+    isOnRampFlow,
     payAmount,
     payToken,
-    rampMode,
     receiveToken,
-    selectedCryptoPayToken,
-    selectedCryptoReceiveToken,
   ]);
 
   const handleCreateOrder = async (partner) => {
+    if (!isActionableFlow) {
+      return;
+    }
+
     setLoading(true);
 
     try {
       const result = await createRedirectOrder({
         countryCode,
-        rampType: rampMode,
-        fromCurrency: isOnRamp ? payToken.code : selectedCryptoPayToken.code,
-        toCurrency: isOnRamp ? selectedCryptoReceiveToken.code : receiveToken.code,
-        paymentMethod: isOnRamp ? payToken.paymentMethod : receiveToken.paymentMethod,
+        rampType: isOnRampFlow ? 'ONRAMP' : 'OFFRAMP',
+        fromCurrency: payToken.code,
+        toCurrency: receiveToken.code,
+        paymentMethod: isOnRampFlow ? payToken.paymentMethod : receiveToken.paymentMethod,
         fromAmount: payAmount,
         partnerId: partner.partnerId,
       });
@@ -552,27 +561,55 @@ export default function SwapCard() {
     await handleCreateOrder(bestPartner);
   };
 
+  const handleSwitchSides = () => {
+    if (!payToken || !receiveToken) {
+      return;
+    }
+
+    setActiveSelector(null);
+    setPayToken(receiveToken);
+    setReceiveToken(payToken);
+    setPayAmount('');
+    setReceiveAmount('');
+    setBestPartner(null);
+    setError(null);
+  };
+
   const getButtonText = () => {
+    if (isCryptoToCryptoFlow) return 'Swap with Kamino';
+    if (isFiatToFiatFlow) return 'Fiat to fiat unavailable';
     if (loading) return 'Loading...';
     if (!payAmount) return 'Enter amount';
     if (bestPartner) {
-      return isOnRamp ? `Buy via ${bestPartner.partnerName}` : `Withdraw via ${bestPartner.partnerName}`;
+      return isOnRampFlow ? `Buy via ${bestPartner.partnerName}` : `Withdraw via ${bestPartner.partnerName}`;
     }
-    return isOnRamp ? 'Get buy quote' : 'Get payout quote';
+    if (isOnRampFlow) return 'Get buy quote';
+    if (isOffRampFlow) return 'Get payout quote';
+    return 'Choose a supported pair';
   };
 
-  const payHelperText = isOnRamp
+  const payHelperText = payType === 'fiat'
     ? formatFiatValue(payAmount, payToken?.code || detectedCurrency || 'EUR')
     : payAmount
-      ? `$${(Number.parseFloat(payAmount) * (selectedCryptoPayToken.code === 'SOLANA_SOL' ? 150 : 1)).toFixed(2)}`
+      ? `$${(Number.parseFloat(payAmount) * (payToken?.code === 'SOLANA_SOL' ? 150 : 1)).toFixed(2)}`
       : '$0.00';
 
-  const receiveHelperText = isOnRamp
-    ? `${receiveAmount || '0'} ${selectedCryptoReceiveToken.name}`
-    : formatFiatValue(receiveAmount, receiveToken?.code || detectedCurrency || 'EUR');
+  const receiveHelperText = receiveType === 'fiat'
+    ? formatFiatValue(receiveAmount, receiveToken?.code || detectedCurrency || 'EUR')
+    : receiveToken
+      ? `${receiveAmount || '0'} ${receiveToken.name}`
+      : 'Select an asset';
 
-  const payAssetTypeLabel = isOnRamp ? 'Fiat' : 'Crypto';
-  const receiveAssetTypeLabel = isOnRamp ? 'Crypto' : 'Fiat';
+  const payAssetTypeLabel = payType === 'fiat' ? 'Fiat' : 'Crypto';
+  const receiveAssetTypeLabel = receiveType === 'fiat' ? 'Fiat' : 'Crypto';
+  const actionDisabled = loading || !payAmount || !bestPartner || !isActionableFlow;
+  const routeSummary = isCryptoToCryptoFlow
+    ? 'Kamino crypto swap stays disabled in this demo.'
+    : isFiatToFiatFlow
+      ? 'Fiat to fiat is not available in this demo.'
+      : bestPartner && payAmount
+        ? `${isOnRampFlow ? 'Best buy route' : 'Best payout route'} via ${bestPartner.partnerName}`
+        : `Enter an amount to fetch the best ${isOnRampFlow ? 'on-ramp' : isOffRampFlow ? 'off-ramp' : 'route'}.`;
 
   return (
     <div className="mx-auto w-full max-w-xl">
@@ -584,7 +621,6 @@ export default function SwapCard() {
         loading={selectorLoading}
         onClose={() => setActiveSelector(null)}
         onSelect={handleSelectToken}
-        selectableTokenIds={selectorSelectableTokenIds}
       />
 
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -622,19 +658,11 @@ export default function SwapCard() {
               <div className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-cyan-300">{payAssetTypeLabel}</div>
               <div className="mt-1 text-sm font-medium text-slate-400">You pay</div>
             </div>
-            {isOnRamp ? (
-              <TokenSelectorButton
-                selected={payToken}
-                loading={loadingPayTokens}
-                onClick={() => setActiveSelector('pay')}
-              />
-            ) : (
-              <TokenSelectorButton
-                selected={selectedCryptoPayToken}
-                loading={false}
-                onClick={() => setActiveSelector('pay')}
-              />
-            )}
+            <TokenSelectorButton
+              selected={payToken}
+              loading={!payToken && loadingPayFiatTokens}
+              onClick={() => setActiveSelector('pay')}
+            />
           </div>
 
           <div className="flex items-end justify-between gap-4">
@@ -650,7 +678,7 @@ export default function SwapCard() {
             </div>
 
             <div className="hidden rounded-2xl border border-white/6 bg-[#0e1c2c] px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 sm:block">
-              {isOnRamp ? 'Fund instantly' : 'Available instantly'}
+              {payType === 'fiat' ? 'Fund instantly' : 'Available instantly'}
             </div>
           </div>
         </div>
@@ -658,10 +686,10 @@ export default function SwapCard() {
         <div className="relative z-10 -my-3 flex justify-center">
           <button
             type="button"
-            onClick={toggleRampMode}
+            onClick={handleSwitchSides}
             className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-[#13253b] shadow-[0_16px_32px_rgba(3,10,20,0.45)] transition hover:border-cyan-400/35 hover:bg-[#17304c]"
-            title={`Switch to ${isOnRamp ? 'off-ramp' : 'on-ramp'}`}
-            aria-label={`Switch to ${isOnRamp ? 'off-ramp' : 'on-ramp'}`}
+            title="Swap assets between both sides"
+            aria-label="Swap assets between both sides"
           >
             <svg className="h-6 w-6 text-slate-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M7 7h10m0 0-3-3m3 3-3 3M17 17H7m0 0 3-3m-3 3 3 3" />
@@ -675,19 +703,11 @@ export default function SwapCard() {
               <div className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-cyan-300">{receiveAssetTypeLabel}</div>
               <div className="mt-1 text-sm font-medium text-slate-400">You receive</div>
             </div>
-            {isOnRamp ? (
-              <TokenSelectorButton
-                selected={selectedCryptoReceiveToken}
-                loading={false}
-                onClick={() => setActiveSelector('receive')}
-              />
-            ) : (
-              <TokenSelectorButton
-                selected={receiveToken}
-                loading={loadingReceiveTokens}
-                onClick={() => setActiveSelector('receive')}
-              />
-            )}
+            <TokenSelectorButton
+              selected={receiveToken}
+              loading={!receiveToken && loadingReceiveFiatTokens}
+              onClick={() => setActiveSelector('receive')}
+            />
           </div>
 
           <div className="flex items-end gap-3">
@@ -707,19 +727,17 @@ export default function SwapCard() {
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="rounded-2xl border border-white/6 bg-[#0b1624] px-4 py-3 text-sm text-slate-400">
-            {bestPartner && payAmount
-              ? `${isOnRamp ? 'Best buy route' : 'Best payout route'} via ${bestPartner.partnerName}`
-              : `Enter an amount to fetch the best ${isOnRamp ? 'on-ramp' : 'off-ramp'} quote.`}
+            {routeSummary}
           </div>
 
           <div className="rounded-2xl border border-white/6 bg-[#0b1624] px-4 py-3 text-sm text-slate-400">
-            Redirect checkout after quote confirmation.
+            {isCryptoToCryptoFlow ? 'Kamino button is intentionally disabled in this demo.' : 'Redirect checkout after quote confirmation.'}
           </div>
         </div>
 
         <button
           onClick={handleSwap}
-          disabled={loading || !payAmount || !bestPartner}
+          disabled={actionDisabled}
           className="mt-4 w-full rounded-[1.4rem] bg-[linear-gradient(180deg,#396690_0%,#274c72_100%)] py-4 text-lg font-semibold text-white shadow-[0_18px_40px_rgba(21,59,97,0.42)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {getButtonText()}
