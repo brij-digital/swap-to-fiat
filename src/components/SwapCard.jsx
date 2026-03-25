@@ -331,11 +331,24 @@ export default function SwapCard() {
 
   const handleSelectToken = (token) => {
     if (activeSelector === 'pay') {
+      const wouldBecomeFiatToFiat = token.type === 'fiat' && receiveToken?.type === 'fiat';
+
       setPayToken(token);
+
+      if (wouldBecomeFiatToFiat) {
+        setReceiveToken(CRYPTO_TOKENS[1] || CRYPTO_TOKENS[0] || null);
+      }
+
+      setReceiveAmount('');
+      setBestPartner(null);
+      setError(null);
       return;
     }
 
     setReceiveToken(token);
+    setReceiveAmount('');
+    setBestPartner(null);
+    setError(null);
   };
 
   useEffect(() => {
