@@ -45,7 +45,7 @@ function App() {
       <div className="relative z-10 mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-6xl items-center justify-center">
         <div className="w-full max-w-xl">
           <div className="mb-6">
-            <div className="kamino-badge">Brij Off-Ramp Demo</div>
+            <div className="kamino-badge">Brij Ramp Demo</div>
           </div>
 
           <SwapCard rampMode={rampMode} />
