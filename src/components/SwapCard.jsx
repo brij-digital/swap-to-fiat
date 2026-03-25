@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   createRedirectOrder,
   getAvailablePartners,
@@ -31,21 +31,7 @@ const CRYPTO_TOKENS = [
   { id: 'USDC', name: 'USDC', icon: `${BASE}usdc.svg`, code: 'SOLANA_USDC', type: 'crypto', decimals: 2 },
 ];
 
-function TokenDropdown({ tokens, selected, onSelect, loading }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const handleClick = (event) => {
-      if (ref.current && !ref.current.contains(event.target)) {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
-
+function TokenSelectorButton({ selected, loading, onClick }) {
   if (loading || !selected) {
     return (
       <div className="flex items-center gap-2 rounded-full border border-white/8 bg-[#17263a] px-3 py-2 text-sm text-slate-300">
@@ -56,49 +42,183 @@ function TokenDropdown({ tokens, selected, onSelect, loading }) {
   }
 
   return (
-    <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen((value) => !value)}
-        className="flex items-center gap-2 rounded-full border border-white/8 bg-[#17263a] px-3 py-2 text-slate-100 transition hover:border-cyan-400/30 hover:bg-[#1b2d45]"
-      >
-        <img src={selected.icon} alt={selected.name} className="h-6 w-6 rounded-full object-cover" />
-        <span className="max-w-[12rem] truncate font-semibold tracking-[-0.02em]">{selected.name}</span>
-        <svg className={`h-4 w-4 transition ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-2 rounded-full border border-white/8 bg-[#17263a] px-3 py-2 text-slate-100 transition hover:border-cyan-400/30 hover:bg-[#1b2d45]"
+    >
+      <img src={selected.icon} alt={selected.name} className="h-6 w-6 rounded-full object-cover" />
+      <span className="max-w-[12rem] truncate font-semibold tracking-[-0.02em]">{selected.name}</span>
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      </svg>
+    </button>
+  );
+}
 
-      {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 min-w-[260px] overflow-hidden rounded-2xl border border-white/10 bg-[#0d1828]/95 shadow-[0_24px_80px_rgba(2,8,23,0.55)] backdrop-blur-xl">
-          <div className="max-h-[320px] overflow-y-auto">
-            {tokens.map((token) => (
-              <button
-                key={token.id}
-                onClick={() => {
-                  onSelect(token);
-                  setOpen(false);
-                }}
-                className={`flex w-full items-center gap-3 px-4 py-3 text-left transition ${
-                  selected.id === token.id ? 'bg-[#16304d]' : 'hover:bg-[#12243a]'
-                }`}
-              >
-                <img src={token.icon} alt={token.name} className="h-7 w-7 rounded-full object-cover" />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium text-slate-100">{token.name}</div>
-                  {token.subtitle && (
-                    <div className="truncate text-xs text-slate-500">{token.subtitle}</div>
-                  )}
-                </div>
-                {selected.id === token.id && (
-                  <svg className="h-4 w-4 flex-shrink-0 text-cyan-300" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
+function TokenSelectorModal({ isOpen, title, tokens, selected, loading, onClose, onSelect }) {
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined;
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setSearch('');
+    }
+  }, [isOpen]);
+
+  const filteredTokens = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) {
+      return tokens;
+    }
+
+    return tokens.filter((token) =>
+      token.name.toLowerCase().includes(query) ||
+      token.code?.toLowerCase().includes(query) ||
+      token.subtitle?.toLowerCase().includes(query) ||
+      token.paymentMethod?.toLowerCase().includes(query),
+    );
+  }, [search, tokens]);
+
+  const quickPicks = filteredTokens.slice(0, 6);
+  const fiatTokens = filteredTokens.filter((token) => token.type === 'fiat');
+  const cryptoTokens = filteredTokens.filter((token) => token.type !== 'fiat');
+
+  if (!isOpen) {
+    return null;
+  }
+
+  const renderTokenRow = (token) => (
+    <button
+      key={token.id}
+      type="button"
+      onClick={() => {
+        onSelect(token);
+        onClose();
+      }}
+      className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition ${
+        selected?.id === token.id ? 'bg-[#16304d]' : 'hover:bg-[#12243a]'
+      }`}
+    >
+      <img src={token.icon} alt={token.name} className="h-10 w-10 rounded-full object-cover" />
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-semibold text-slate-50">{token.name}</div>
+        {token.subtitle && (
+          <div className="truncate text-sm text-slate-500">{token.subtitle}</div>
+        )}
+      </div>
+      {selected?.id === token.id && (
+        <svg className="h-5 w-5 flex-shrink-0 text-cyan-300" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+        </svg>
       )}
+    </button>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#020814]/80 p-4 pt-10 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="w-full max-w-4xl rounded-[2rem] border border-white/8 bg-[#121f35] p-5 shadow-[0_30px_120px_rgba(2,8,23,0.65)]"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="mb-5 flex items-center justify-between gap-4">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Asset Picker</div>
+            <div className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-white">{title}</div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-white/8 bg-[#16253b] px-4 py-2 text-sm text-slate-300 transition hover:text-white"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="mb-6 flex items-center gap-3 rounded-[1.4rem] border border-white/8 bg-[#16253b] px-4 py-4">
+          <svg className="h-6 w-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            autoFocus
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search token or fiat"
+            className="w-full bg-transparent text-2xl font-medium text-slate-100 outline-none placeholder:text-slate-500"
+          />
+        </div>
+
+        {loading ? (
+          <div className="rounded-[1.5rem] border border-white/8 bg-[#16253b] px-5 py-8 text-center text-slate-400">
+            Loading assets...
+          </div>
+        ) : (
+          <>
+            {quickPicks.length > 0 && (
+              <div className="mb-6 flex flex-wrap gap-3">
+                {quickPicks.map((token) => (
+                  <button
+                    key={token.id}
+                    type="button"
+                    onClick={() => {
+                      onSelect(token);
+                      onClose();
+                    }}
+                    className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${
+                      selected?.id === token.id
+                        ? 'border-cyan-300/40 bg-[#1b3352] text-white'
+                        : 'border-white/10 bg-[#1a2a43] text-slate-100 hover:border-cyan-400/25'
+                    }`}
+                  >
+                    <img src={token.icon} alt={token.name} className="h-7 w-7 rounded-full object-cover" />
+                    <span className="font-semibold">{token.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {fiatTokens.length > 0 && (
+              <div className="mb-6">
+                <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Fiat</div>
+                <div className="rounded-[1.5rem] border border-white/8 bg-[#16253b] p-2">
+                  {fiatTokens.map(renderTokenRow)}
+                </div>
+              </div>
+            )}
+
+            {cryptoTokens.length > 0 && (
+              <div>
+                <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  {fiatTokens.length > 0 ? 'Crypto' : 'All Assets'}
+                </div>
+                <div className="rounded-[1.5rem] border border-white/8 bg-[#16253b] p-2">
+                  {cryptoTokens.map(renderTokenRow)}
+                </div>
+              </div>
+            )}
+
+            {filteredTokens.length === 0 && (
+              <div className="rounded-[1.5rem] border border-white/8 bg-[#16253b] px-5 py-8 text-center text-slate-400">
+                No asset found for this search.
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -143,6 +263,7 @@ export default function SwapCard() {
   const [rampMode, setRampMode] = useState('OFFRAMP');
   const isOnRamp = rampMode === 'ONRAMP';
   const modeLabel = isOnRamp ? 'On-ramp' : 'Off-ramp';
+  const [activeSelector, setActiveSelector] = useState(null);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -164,7 +285,30 @@ export default function SwapCard() {
   const selectedCryptoReceiveToken = CRYPTO_TOKENS.find((token) => token.code === receiveToken?.code) || CRYPTO_TOKENS[1];
 
   const toggleRampMode = () => {
+    setActiveSelector(null);
     setRampMode((currentMode) => (currentMode === 'ONRAMP' ? 'OFFRAMP' : 'ONRAMP'));
+  };
+
+  const paySelectorTokens = isOnRamp ? payTokens : CRYPTO_TOKENS;
+  const paySelectorSelected = isOnRamp ? payToken : selectedCryptoPayToken;
+  const paySelectorLoading = isOnRamp ? loadingPayTokens : false;
+
+  const receiveSelectorTokens = isOnRamp ? CRYPTO_TOKENS : receiveTokens;
+  const receiveSelectorSelected = isOnRamp ? selectedCryptoReceiveToken : receiveToken;
+  const receiveSelectorLoading = isOnRamp ? false : loadingReceiveTokens;
+
+  const selectorTitle = activeSelector === 'pay' ? 'Select asset you pay with' : 'Select asset you receive';
+  const selectorTokens = activeSelector === 'pay' ? paySelectorTokens : receiveSelectorTokens;
+  const selectorSelected = activeSelector === 'pay' ? paySelectorSelected : receiveSelectorSelected;
+  const selectorLoading = activeSelector === 'pay' ? paySelectorLoading : receiveSelectorLoading;
+
+  const handleSelectToken = (token) => {
+    if (activeSelector === 'pay') {
+      setPayToken(token);
+      return;
+    }
+
+    setReceiveToken(token);
   };
 
   useEffect(() => {
@@ -389,6 +533,16 @@ export default function SwapCard() {
 
   return (
     <div className="mx-auto w-full max-w-xl">
+      <TokenSelectorModal
+        isOpen={activeSelector !== null}
+        title={selectorTitle}
+        tokens={selectorTokens}
+        selected={selectorSelected}
+        loading={selectorLoading}
+        onClose={() => setActiveSelector(null)}
+        onSelect={handleSelectToken}
+      />
+
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/8 bg-[#11233a] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
@@ -422,18 +576,16 @@ export default function SwapCard() {
           <div className="mb-4 flex items-center justify-between gap-3">
             <span className="text-sm font-medium text-slate-400">You pay</span>
             {isOnRamp ? (
-              <TokenDropdown
-                tokens={payTokens}
+              <TokenSelectorButton
                 selected={payToken}
-                onSelect={setPayToken}
                 loading={loadingPayTokens}
+                onClick={() => setActiveSelector('pay')}
               />
             ) : (
-              <TokenDropdown
-                tokens={CRYPTO_TOKENS}
+              <TokenSelectorButton
                 selected={selectedCryptoPayToken}
-                onSelect={setPayToken}
                 loading={false}
+                onClick={() => setActiveSelector('pay')}
               />
             )}
           </div>
@@ -474,18 +626,16 @@ export default function SwapCard() {
           <div className="mb-4 flex items-center justify-between gap-3">
             <span className="text-sm font-medium text-slate-400">You receive</span>
             {isOnRamp ? (
-              <TokenDropdown
-                tokens={CRYPTO_TOKENS}
+              <TokenSelectorButton
                 selected={selectedCryptoReceiveToken}
-                onSelect={setReceiveToken}
                 loading={false}
+                onClick={() => setActiveSelector('receive')}
               />
             ) : (
-              <TokenDropdown
-                tokens={receiveTokens}
+              <TokenSelectorButton
                 selected={receiveToken}
-                onSelect={setReceiveToken}
                 loading={loadingReceiveTokens}
+                onClick={() => setActiveSelector('receive')}
               />
             )}
           </div>
