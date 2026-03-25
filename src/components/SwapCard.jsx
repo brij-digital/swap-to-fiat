@@ -31,6 +31,12 @@ const CRYPTO_TOKENS = [
   { id: 'USDC', name: 'USDC', icon: `${BASE}usdc.svg`, code: 'SOLANA_USDC', type: 'crypto', decimals: 2 },
 ];
 
+const PARTNER_PROBE_AMOUNTS = {
+  SOLANA_SOL: '1',
+  SOLANA_USDC: '1000',
+  default: '1000',
+};
+
 function TokenSelectorButton({ selected, loading, onClick }) {
   if (loading || !selected) {
     return (
@@ -267,6 +273,37 @@ function createFiatOptions(currency, paymentMethods, countryCode) {
   }));
 }
 
+async function filterPaymentMethodsWithPartners({
+  countryCode,
+  rampType,
+  fromCurrency,
+  toCurrency,
+  paymentMethods,
+  fromAmount,
+}) {
+  const checks = await Promise.all(
+    paymentMethods.map(async (paymentMethod) => {
+      try {
+        const result = await getAvailablePartners({
+          countryCode,
+          rampType,
+          fromCurrency,
+          toCurrency,
+          paymentMethod: paymentMethod.code,
+          fromAmount,
+          partnerTypes: ['REDIRECT'],
+        });
+
+        return (result.partners || []).length > 0 ? paymentMethod : null;
+      } catch (error) {
+        return null;
+      }
+    }),
+  );
+
+  return checks.filter(Boolean);
+}
+
 function formatTokenAmount(value, token) {
   const amount = Number.parseFloat(value || '0');
   if (!Number.isFinite(amount)) {
@@ -367,9 +404,22 @@ export default function SwapCard() {
           return;
         }
 
+        const availablePaymentMethods = await filterPaymentMethodsWithPartners({
+          countryCode: result.countryCode,
+          rampType: 'ONRAMP',
+          fromCurrency: result.fromCurrency,
+          toCurrency: selectedCryptoReceiveToken.code,
+          paymentMethods: result.paymentMethods || [],
+          fromAmount: PARTNER_PROBE_AMOUNTS.default,
+        });
+
+        if (ignore) {
+          return;
+        }
+
         const fiatOptions = createFiatOptions(
           result.fromCurrency,
-          (result.paymentMethods || []).slice(0, 4),
+          availablePaymentMethods,
           result.countryCode,
         );
 
@@ -385,7 +435,7 @@ export default function SwapCard() {
             return current;
           }
 
-          return fiatOptions.find((option) => option.id === current.id) || fiatOptions[0] || current;
+          return fiatOptions.find((option) => option.id === current.id) || fiatOptions[0] || null;
         });
       } catch (err) {
         if (!ignore) {
@@ -421,9 +471,22 @@ export default function SwapCard() {
           return;
         }
 
+        const availablePaymentMethods = await filterPaymentMethodsWithPartners({
+          countryCode: result.countryCode,
+          rampType: 'OFFRAMP',
+          fromCurrency: selectedCryptoPayToken.code,
+          toCurrency: result.toCurrency,
+          paymentMethods: result.paymentMethods || [],
+          fromAmount: PARTNER_PROBE_AMOUNTS[selectedCryptoPayToken.code] || PARTNER_PROBE_AMOUNTS.default,
+        });
+
+        if (ignore) {
+          return;
+        }
+
         const fiatOptions = createFiatOptions(
           result.toCurrency,
-          (result.paymentMethods || []).slice(0, 4),
+          availablePaymentMethods,
           result.countryCode,
         );
 
@@ -439,7 +502,7 @@ export default function SwapCard() {
             return current;
           }
 
-          return fiatOptions.find((option) => option.id === current.id) || fiatOptions[0] || current;
+          return fiatOptions.find((option) => option.id === current.id) || fiatOptions[0] || null;
         });
       } catch (err) {
         if (!ignore) {
