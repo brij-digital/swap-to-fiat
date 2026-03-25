@@ -139,7 +139,8 @@ function formatFiatValue(value, currency) {
   return `${symbol}${safeAmount}`;
 }
 
-export default function SwapCard({ rampMode = 'OFFRAMP' }) {
+export default function SwapCard() {
+  const [rampMode, setRampMode] = useState('OFFRAMP');
   const isOnRamp = rampMode === 'ONRAMP';
   const modeLabel = isOnRamp ? 'On-ramp' : 'Off-ramp';
 
@@ -161,6 +162,10 @@ export default function SwapCard({ rampMode = 'OFFRAMP' }) {
 
   const selectedCryptoPayToken = CRYPTO_TOKENS.find((token) => token.code === payToken?.code) || CRYPTO_TOKENS[1];
   const selectedCryptoReceiveToken = CRYPTO_TOKENS.find((token) => token.code === receiveToken?.code) || CRYPTO_TOKENS[1];
+
+  const toggleRampMode = () => {
+    setRampMode((currentMode) => (currentMode === 'ONRAMP' ? 'OFFRAMP' : 'ONRAMP'));
+  };
 
   useEffect(() => {
     setError(null);
@@ -452,11 +457,17 @@ export default function SwapCard({ rampMode = 'OFFRAMP' }) {
         </div>
 
         <div className="relative z-10 -my-3 flex justify-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-[#13253b] shadow-[0_16px_32px_rgba(3,10,20,0.45)]">
+          <button
+            type="button"
+            onClick={toggleRampMode}
+            className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-[#13253b] shadow-[0_16px_32px_rgba(3,10,20,0.45)] transition hover:border-cyan-400/35 hover:bg-[#17304c]"
+            title={`Switch to ${isOnRamp ? 'off-ramp' : 'on-ramp'}`}
+            aria-label={`Switch to ${isOnRamp ? 'off-ramp' : 'on-ramp'}`}
+          >
             <svg className="h-6 w-6 text-slate-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M7 7h10m0 0-3-3m3 3-3 3M17 17H7m0 0 3-3m-3 3 3 3" />
             </svg>
-          </div>
+          </button>
         </div>
 
         <div className="rounded-[1.75rem] border border-white/6 bg-[#101f31] p-5 shadow-[inset_0_1px_0_rgba(191,233,255,0.05)]">
