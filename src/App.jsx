@@ -43,12 +43,6 @@ function App() {
         <div className="w-full max-w-xl">
           <div className="mb-6">
             <div className="kamino-badge">Brij Off-Ramp Demo</div>
-            <h1 className="kamino-title mt-4">
-              Sell crypto into local fiat with a cleaner, Kamino-inspired surface.
-            </h1>
-            <p className="kamino-subtitle mt-3">
-              A tighter navy palette, softer contrast, and a more premium swap shell for the demo link.
-            </p>
           </div>
 
           <SwapCard />
