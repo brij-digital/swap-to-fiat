@@ -66,9 +66,9 @@ function TokenDropdown({ tokens, selected, onSelect, loading, showTabs = false }
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 bg-[#2a2a3e] rounded-full px-3 py-2">
-        <div className="w-6 h-6 bg-gray-600 rounded-full animate-pulse"></div>
-        <span className="text-gray-400">Loading...</span>
+      <div className="flex items-center gap-2 rounded-full border border-white/8 bg-[#17263a] px-3 py-2 text-sm text-slate-300">
+        <div className="h-6 w-6 animate-pulse rounded-full bg-slate-600"></div>
+        <span>Loading...</span>
       </div>
     );
   }
@@ -81,27 +81,27 @@ function TokenDropdown({ tokens, selected, onSelect, loading, showTabs = false }
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 bg-[#2a2a3e] hover:bg-[#3a3a4e] rounded-full px-3 py-2 transition"
+        className="flex items-center gap-2 rounded-full border border-white/8 bg-[#17263a] px-3 py-2 text-slate-100 transition hover:border-cyan-400/30 hover:bg-[#1b2d45]"
       >
-        <img src={selected.icon} alt={selected.name} className="w-6 h-6 rounded-full" />
-        <span className="font-medium">{selected.name}</span>
+        <img src={selected.icon} alt={selected.name} className="h-6 w-6 rounded-full" />
+        <span className="font-semibold tracking-[-0.02em]">{selected.name}</span>
         <svg className={`w-4 h-4 transition ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
       
       {open && (
-        <div className="absolute right-0 top-full mt-2 bg-[#1a1a2e] border border-[#3a3a4e] rounded-xl overflow-hidden z-50 min-w-[240px] shadow-xl">
+        <div className="absolute right-0 top-full z-50 mt-2 min-w-[240px] overflow-hidden rounded-2xl border border-white/10 bg-[#0d1828]/95 shadow-[0_24px_80px_rgba(2,8,23,0.55)] backdrop-blur-xl">
           {/* Tabs - only show if both types exist and showTabs is true */}
           {showTabs && hasBothTypes && (
             <div className="p-2">
-              <div className="flex bg-[#0d0d1a] rounded-full p-1">
+              <div className="flex rounded-full bg-[#09111d] p-1">
                 <button
                   onClick={() => setActiveTab('crypto')}
                   className={`flex-1 py-2 px-4 rounded-full text-sm font-medium transition ${
                     activeTab === 'crypto' 
-                      ? 'bg-white text-black' 
-                      : 'text-gray-400 hover:text-white'
+                      ? 'bg-[#2a4f78] text-white shadow-[inset_0_1px_0_rgba(204,236,255,0.18)]' 
+                      : 'text-slate-400 hover:text-white'
                   }`}
                 >
                   Crypto
@@ -110,8 +110,8 @@ function TokenDropdown({ tokens, selected, onSelect, loading, showTabs = false }
                   onClick={() => setActiveTab('fiat')}
                   className={`flex-1 py-2 px-4 rounded-full text-sm font-medium transition ${
                     activeTab === 'fiat' 
-                      ? 'bg-white text-black' 
-                      : 'text-gray-400 hover:text-white'
+                      ? 'bg-[#2a4f78] text-white shadow-[inset_0_1px_0_rgba(204,236,255,0.18)]' 
+                      : 'text-slate-400 hover:text-white'
                   }`}
                 >
                   Fiat
@@ -126,19 +126,19 @@ function TokenDropdown({ tokens, selected, onSelect, loading, showTabs = false }
               <button
                 key={token.id}
                 onClick={() => { onSelect(token); setOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-[#2a2a3e] transition text-left ${
-                  selected.id === token.id ? 'bg-[#2a2a3e]' : ''
+                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition ${
+                  selected.id === token.id ? 'bg-[#16304d]' : 'hover:bg-[#12243a]'
                 }`}
               >
-                <img src={token.icon} alt={token.name} className="w-6 h-6 rounded-full" />
+                <img src={token.icon} alt={token.name} className="h-6 w-6 rounded-full" />
                 <div className="flex flex-col flex-1 min-w-0">
-                  <span className="truncate font-medium">{token.name}</span>
+                  <span className="truncate font-medium text-slate-100">{token.name}</span>
                   {token.type === 'fiat' && token.paymentMethod && (
-                    <span className="text-xs text-gray-500 truncate">{token.paymentMethod}</span>
+                    <span className="truncate text-xs text-slate-500">{token.paymentMethod}</span>
                   )}
                 </div>
                 {selected.id === token.id && (
-                  <svg className="w-4 h-4 text-violet-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className="h-4 w-4 flex-shrink-0 text-cyan-300" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
                 )}
@@ -332,110 +332,133 @@ export default function SwapCard() {
   const currencySymbol = CURRENCY_SYMBOLS[detectedCurrency] || detectedCurrency || '';
 
   return (
-    <div className="w-full max-w-md mx-auto">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
-        <button className="p-2 bg-[#1a1a2e] rounded-full hover:bg-[#2a2a3e] transition">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        </button>
-        <div className="bg-[#1a1a2e] rounded-full px-4 py-2 text-sm text-gray-300">
-          {countryCode ? `🌍 ${countryCode} • ${detectedCurrency}` : 'Detecting...'}
+    <div className="mx-auto w-full max-w-xl">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/8 bg-[#11233a] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+            <svg className="h-5 w-5 text-slate-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
+
+          <div>
+            <p className="m-0 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Liquidity router</p>
+            <p className="m-0 mt-1 text-sm font-medium text-slate-300">
+              {countryCode ? `Auto-detected ${countryCode} • ${detectedCurrency}` : 'Detecting region and fiat rail...'}
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-full border border-cyan-400/15 bg-[#11233a] px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">
+          Kamino mode
         </div>
       </div>
 
-      {/* Error */}
       {error && (
-        <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-sm">
+        <div className="mb-4 rounded-2xl border border-red-500/35 bg-red-500/10 px-4 py-3 text-sm text-red-200">
           {error}
         </div>
       )}
 
-      {/* Sell Box */}
-      <div className="bg-[#131320] border border-[#2a2a3e] rounded-2xl p-4 mb-2">
-        <div className="flex justify-between items-center mb-3">
-          <span className="text-gray-400 text-sm">Sell</span>
-          <TokenDropdown 
-            tokens={SELL_TOKENS} 
-            selected={sellToken} 
-            onSelect={setSellToken}
-          />
-        </div>
-        <input
-          type="number"
-          value={sellAmount}
-          onChange={(e) => setSellAmount(e.target.value)}
-          placeholder="0.0"
-          className="w-full bg-transparent text-4xl font-light outline-none text-white placeholder-gray-600 mb-2"
-        />
-        <div className="text-gray-500 text-sm">
-          {sellAmount ? `$${(parseFloat(sellAmount) * (sellToken.code === 'SOLANA_SOL' ? 150 : 1)).toFixed(2)}` : '$0.00'}
-        </div>
-      </div>
-
-      {/* Swap Arrow */}
-      <div className="flex justify-center -my-3 relative z-10">
-        <div className="bg-[#1a1a2e] border border-[#2a2a3e] rounded-full p-2">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-          </svg>
-        </div>
-      </div>
-
-      {/* Buy Box */}
-      <div className="bg-[#131320] rounded-2xl p-4 mb-4">
-        <div className="flex justify-between items-center mb-3">
-          <span className="text-gray-400 text-sm">Receive</span>
-          {buyToken && (
-            <TokenDropdown 
-              tokens={buyTokens} 
-              selected={buyToken} 
-              onSelect={setBuyToken}
-              loading={loadingBuyTokens}
-              showTabs={true}
+      <div className="rounded-[2rem] border border-white/8 bg-[#0d1828]/90 p-4 shadow-[0_32px_90px_rgba(2,8,23,0.5)] backdrop-blur-xl">
+        <div className="rounded-[1.75rem] border border-white/6 bg-[#142338] p-5 shadow-[inset_0_1px_0_rgba(191,233,255,0.05)]">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <span className="text-sm font-medium text-slate-400">You pay</span>
+            <TokenDropdown
+              tokens={SELL_TOKENS}
+              selected={sellToken}
+              onSelect={setSellToken}
             />
-          )}
-          {!buyToken && loadingBuyTokens && (
-            <div className="flex items-center gap-2 bg-[#2a2a3e] rounded-full px-3 py-2">
-              <div className="w-6 h-6 bg-gray-600 rounded-full animate-pulse"></div>
-              <span className="text-gray-400">Loading...</span>
+          </div>
+
+          <div className="flex items-end justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <input
+                type="number"
+                value={sellAmount}
+                onChange={(e) => setSellAmount(e.target.value)}
+                placeholder="0"
+                className="w-full bg-transparent text-5xl font-semibold tracking-[-0.05em] text-white outline-none placeholder:text-slate-600"
+              />
+              <div className="mt-3 text-sm text-slate-500">
+                {sellAmount ? `$${(parseFloat(sellAmount) * (sellToken.code === 'SOLANA_SOL' ? 150 : 1)).toFixed(2)}` : '$0.00'}
+              </div>
             </div>
-          )}
+
+            <div className="hidden rounded-2xl border border-white/6 bg-[#0e1c2c] px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 sm:block">
+              Available instantly
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className={`text-4xl font-light ${buyAmount ? 'text-white' : 'text-gray-600'}`}>
-            {loading ? (
-              <span className="animate-pulse">...</span>
-            ) : (
-              buyAmount || '0.0'
+
+        <div className="relative z-10 -my-3 flex justify-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-[#13253b] shadow-[0_16px_32px_rgba(3,10,20,0.45)]">
+            <svg className="h-6 w-6 text-slate-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+            </svg>
+          </div>
+        </div>
+
+        <div className="rounded-[1.75rem] border border-white/6 bg-[#101f31] p-5 shadow-[inset_0_1px_0_rgba(191,233,255,0.05)]">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <span className="text-sm font-medium text-slate-400">You receive</span>
+            {buyToken && (
+              <TokenDropdown
+                tokens={buyTokens}
+                selected={buyToken}
+                onSelect={setBuyToken}
+                loading={loadingBuyTokens}
+                showTabs={true}
+              />
+            )}
+            {!buyToken && loadingBuyTokens && (
+              <div className="flex items-center gap-2 rounded-full border border-white/8 bg-[#17263a] px-3 py-2 text-sm text-slate-300">
+                <div className="h-6 w-6 animate-pulse rounded-full bg-slate-600"></div>
+                <span>Loading...</span>
+              </div>
             )}
           </div>
-          {bestPartner && (
-            <img src={bestPartner.icon} alt={bestPartner.partnerName} className="w-6 h-6 rounded" title={`Best rate: ${bestPartner.partnerName}`} />
-          )}
+
+          <div className="flex items-end gap-3">
+            <div className={`text-5xl font-semibold tracking-[-0.05em] ${buyAmount ? 'text-white' : 'text-slate-600'}`}>
+              {loading ? (
+                <span className="animate-pulse">...</span>
+              ) : (
+                buyAmount || '0'
+              )}
+            </div>
+            {bestPartner && (
+              <div className="mb-2 flex items-center gap-2 rounded-full border border-cyan-400/15 bg-cyan-400/10 px-3 py-2 text-sm text-cyan-100">
+                <img src={bestPartner.icon} alt={bestPartner.partnerName} className="h-5 w-5 rounded" title={`Best rate: ${bestPartner.partnerName}`} />
+                <span>{bestPartner.partnerName}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-3 text-sm text-slate-500">
+            {buyAmount && buyToken?.type === 'fiat' ? `${currencySymbol}${parseFloat(buyAmount).toFixed(2)}` : '$0.00'}
+          </div>
         </div>
-        <div className="text-gray-500 text-sm">
-          {buyAmount && buyToken?.type === 'fiat' ? `${currencySymbol}${parseFloat(buyAmount).toFixed(2)}` : '$0.00'}
+
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="rounded-2xl border border-white/6 bg-[#0b1624] px-4 py-3 text-sm text-slate-400">
+            {bestPartner && sellAmount ? `Best payout via ${bestPartner.partnerName}` : 'Enter an amount to fetch the best fiat payout.'}
+          </div>
+
+          <div className="rounded-2xl border border-white/6 bg-[#0b1624] px-4 py-3 text-sm text-slate-400">
+            {buyToken?.type === 'crypto' ? 'Crypto receive is preview-only for now.' : 'Redirect checkout after quote confirmation.'}
+          </div>
         </div>
+
+        <button
+          onClick={handleSwap}
+          disabled={loading || !sellAmount || !bestPartner || buyToken?.type === 'crypto'}
+          className="mt-4 w-full rounded-[1.4rem] bg-[linear-gradient(180deg,#396690_0%,#274c72_100%)] py-4 text-lg font-semibold text-white shadow-[0_18px_40px_rgba(21,59,97,0.42)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {getButtonText()}
+        </button>
       </div>
-
-      {/* Rate info */}
-      {bestPartner && sellAmount && (
-        <div className="mb-4 px-2 text-sm text-gray-400 flex justify-between">
-          <span>Best rate via {bestPartner.partnerName}</span>
-        </div>
-      )}
-
-      {/* CTA Button */}
-      <button
-        onClick={handleSwap}
-        disabled={loading || !sellAmount || !bestPartner || buyToken?.type === 'crypto'}
-        className="w-full bg-white text-black font-semibold rounded-2xl py-4 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
-      >
-        {getButtonText()}
-      </button>
     </div>
   );
 }

@@ -18,31 +18,55 @@ function App() {
     return <JumperSwap />;
   }
 
-  // Default Jupiter-style page
+  // Default Kamino-style page
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#0a0a14] to-[#12121f] flex flex-col items-center justify-center p-4">
-      {/* Version switcher */}
-      <div className="absolute top-4 right-4 flex gap-2">
-        <a 
-          href="#/" 
-          className={`px-3 py-1 rounded-full text-sm transition ${route === '#/' || route === '' ? 'bg-violet-600 text-white' : 'bg-[#2a2a3e] text-gray-400 hover:text-white'}`}
+    <div className="kamino-app min-h-screen px-4 py-6">
+      <div className="kamino-orb kamino-orb-left" />
+      <div className="kamino-orb kamino-orb-right" />
+
+      <div className="kamino-switcher">
+        <a
+          href="#/"
+          className={`kamino-switch-pill ${route === '#/' || route === '' ? 'is-active' : ''}`}
         >
-          Jupiter
+          Kamino
         </a>
-        <a 
-          href="#/jumper" 
-          className={`px-3 py-1 rounded-full text-sm transition ${route === '#/jumper' ? 'bg-violet-600 text-white' : 'bg-[#2a2a3e] text-gray-400 hover:text-white'}`}
+        <a
+          href="#/jumper"
+          className={`kamino-switch-pill ${route === '#/jumper' ? 'is-active' : ''}`}
         >
           Jumper
         </a>
       </div>
 
-      {/* Swap Card */}
-      <SwapCard />
+      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-6xl items-center justify-center">
+        <div className="w-full max-w-xl">
+          <div className="mb-6">
+            <div className="kamino-badge">Brij Off-Ramp Demo</div>
+            <h1 className="kamino-title mt-4">
+              Sell crypto into local fiat with a cleaner, Kamino-inspired surface.
+            </h1>
+            <p className="kamino-subtitle mt-3">
+              A tighter navy palette, softer contrast, and a more premium swap shell for the demo link.
+            </p>
+          </div>
 
-      {/* Footer */}
-      <div className="mt-6 text-center text-xs text-gray-600">
-        <p>Powered by <a href="https://brij.fi" target="_blank" rel="noopener noreferrer" className="text-violet-400 hover:underline">Brij.fi</a></p>
+          <SwapCard />
+
+          <div className="mt-6 text-center text-xs text-slate-500">
+            <p>
+              Powered by{' '}
+              <a
+                href="https://brij.fi"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-cyan-300 transition hover:text-white"
+              >
+                Brij.fi
+              </a>
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
