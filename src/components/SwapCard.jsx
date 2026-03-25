@@ -56,8 +56,30 @@ function TokenSelectorButton({ selected, loading, onClick }) {
   );
 }
 
-function TokenSelectorModal({ isOpen, title, tokens, selected, loading, onClose, onSelect }) {
+function mergeUniqueTokens(...groups) {
+  const seen = new Set();
+  return groups.flat().filter((token) => {
+    if (!token?.id || seen.has(token.id)) {
+      return false;
+    }
+
+    seen.add(token.id);
+    return true;
+  });
+}
+
+function TokenSelectorModal({
+  isOpen,
+  title,
+  tokens,
+  selected,
+  loading,
+  onClose,
+  onSelect,
+  selectableTokenIds,
+}) {
   const [search, setSearch] = useState('');
+  const [activeCategory, setActiveCategory] = useState('crypto');
 
   useEffect(() => {
     if (!isOpen) {
@@ -77,8 +99,9 @@ function TokenSelectorModal({ isOpen, title, tokens, selected, loading, onClose,
   useEffect(() => {
     if (isOpen) {
       setSearch('');
+      setActiveCategory(selected?.type === 'fiat' ? 'fiat' : 'crypto');
     }
-  }, [isOpen]);
+  }, [isOpen, selected]);
 
   const filteredTokens = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -96,6 +119,9 @@ function TokenSelectorModal({ isOpen, title, tokens, selected, loading, onClose,
 
   const fiatTokens = filteredTokens.filter((token) => token.type === 'fiat');
   const cryptoTokens = filteredTokens.filter((token) => token.type !== 'fiat');
+  const visibleTokens = activeCategory === 'fiat' ? fiatTokens : cryptoTokens;
+  const canShowFiat = fiatTokens.length > 0 || tokens.some((token) => token.type === 'fiat');
+  const canShowCrypto = cryptoTokens.length > 0 || tokens.some((token) => token.type !== 'fiat');
 
   if (!isOpen) {
     return null;
@@ -105,22 +131,32 @@ function TokenSelectorModal({ isOpen, title, tokens, selected, loading, onClose,
     <button
       key={token.id}
       type="button"
+      disabled={!selectableTokenIds.has(token.id)}
       onClick={() => {
+        if (!selectableTokenIds.has(token.id)) {
+          return;
+        }
+
         onSelect(token);
         onClose();
       }}
       className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition ${
-        selected?.id === token.id ? 'bg-[#16304d]' : 'hover:bg-[#12243a]'
+        !selectableTokenIds.has(token.id)
+          ? 'cursor-not-allowed opacity-55'
+          : selected?.id === token.id
+            ? 'bg-[#16304d]'
+            : 'hover:bg-[#12243a]'
       }`}
     >
       <img src={token.icon} alt={token.name} className="h-10 w-10 rounded-full object-cover" />
       <div className="min-w-0 flex-1">
         <div className="truncate font-semibold text-slate-50">{token.name}</div>
-        {token.subtitle && (
-          <div className="truncate text-sm text-slate-500">{token.subtitle}</div>
-        )}
+        <div className="truncate text-sm text-slate-500">
+          {token.subtitle || (token.type === 'fiat' ? 'Fiat rail' : 'Crypto asset')}
+          {!selectableTokenIds.has(token.id) ? ' • Preview only' : ''}
+        </div>
       </div>
-      {selected?.id === token.id && (
+      {selected?.id === token.id && selectableTokenIds.has(token.id) && (
         <svg className="h-5 w-5 flex-shrink-0 text-cyan-300" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
         </svg>
@@ -167,42 +203,53 @@ function TokenSelectorModal({ isOpen, title, tokens, selected, loading, onClose,
           </div>
         ) : (
           <>
-            {(fiatTokens.length > 0 || cryptoTokens.length > 0) && (
+            {(canShowFiat || canShowCrypto) && (
               <div className="mb-6 flex flex-wrap gap-3">
-                {fiatTokens.length > 0 && (
-                  <div className="rounded-full border border-white/10 bg-[#16253b] px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
+                {canShowFiat && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveCategory('fiat')}
+                    className={`rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition ${
+                      activeCategory === 'fiat'
+                        ? 'border-white/10 bg-[#16253b] text-slate-100'
+                        : 'border-white/8 bg-transparent text-slate-500 hover:text-slate-200'
+                    }`}
+                  >
                     Fiat
-                  </div>
+                  </button>
                 )}
-                {cryptoTokens.length > 0 && (
-                  <div className="rounded-full border border-cyan-300/20 bg-[#16304d] px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">
+                {canShowCrypto && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveCategory('crypto')}
+                    className={`rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition ${
+                      activeCategory === 'crypto'
+                        ? 'border-cyan-300/20 bg-[#16304d] text-cyan-200'
+                        : 'border-white/8 bg-transparent text-slate-500 hover:text-slate-200'
+                    }`}
+                  >
                     Crypto
-                  </div>
+                  </button>
                 )}
               </div>
             )}
 
-            {fiatTokens.length > 0 && (
+            {visibleTokens.length > 0 && (
               <div className="mb-6">
-                <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Fiat</div>
+                <div className={`mb-3 text-xs font-semibold uppercase tracking-[0.18em] ${
+                  activeCategory === 'fiat' ? 'text-slate-300' : 'text-cyan-300'
+                }`}>
+                  {activeCategory}
+                </div>
                 <div className="rounded-[1.5rem] border border-white/8 bg-[#16253b] p-2">
-                  {fiatTokens.map(renderTokenRow)}
+                  {visibleTokens.map(renderTokenRow)}
                 </div>
               </div>
             )}
 
-            {cryptoTokens.length > 0 && (
-              <div>
-                <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Crypto</div>
-                <div className="rounded-[1.5rem] border border-white/8 bg-[#16253b] p-2">
-                  {cryptoTokens.map(renderTokenRow)}
-                </div>
-              </div>
-            )}
-
-            {filteredTokens.length === 0 && (
+            {visibleTokens.length === 0 && (
               <div className="rounded-[1.5rem] border border-white/8 bg-[#16253b] px-5 py-8 text-center text-slate-400">
-                No asset found for this search.
+                {search ? 'No asset found for this search.' : `No ${activeCategory} assets available in this preview.`}
               </div>
             )}
           </>
@@ -285,11 +332,15 @@ export default function SwapCard() {
   const receiveSelectorTokens = isOnRamp ? CRYPTO_TOKENS : receiveTokens;
   const receiveSelectorSelected = isOnRamp ? selectedCryptoReceiveToken : receiveToken;
   const receiveSelectorLoading = isOnRamp ? false : loadingReceiveTokens;
+  const modalTokens = mergeUniqueTokens(CRYPTO_TOKENS, payTokens, receiveTokens);
 
   const selectorTitle = activeSelector === 'pay' ? 'Select asset you pay with' : 'Select asset you receive';
-  const selectorTokens = activeSelector === 'pay' ? paySelectorTokens : receiveSelectorTokens;
+  const selectorTokens = modalTokens;
   const selectorSelected = activeSelector === 'pay' ? paySelectorSelected : receiveSelectorSelected;
   const selectorLoading = activeSelector === 'pay' ? paySelectorLoading : receiveSelectorLoading;
+  const selectorSelectableTokenIds = new Set(
+    (activeSelector === 'pay' ? paySelectorTokens : receiveSelectorTokens).map((token) => token.id),
+  );
 
   const handleSelectToken = (token) => {
     if (activeSelector === 'pay') {
@@ -533,6 +584,7 @@ export default function SwapCard() {
         loading={selectorLoading}
         onClose={() => setActiveSelector(null)}
         onSelect={handleSelectToken}
+        selectableTokenIds={selectorSelectableTokenIds}
       />
 
       <div className="mb-4 flex items-center justify-between gap-3">
