@@ -604,7 +604,7 @@ export default function SwapCard() {
   const payHelperText = payType === 'fiat'
     ? formatFiatValue(payAmount, payToken?.code || detectedCurrency || 'EUR')
     : payAmount
-      ? `$${(Number.parseFloat(payAmount) * (payToken?.code === 'SOLANA_SOL' ? 150 : 1)).toFixed(2)}`
+      ? `$${(Number.parseFloat(payAmount) * (payToken?.code === 'SOLANA_SOL' ? 92 : 1)).toFixed(2)}`
       : '$0.00';
 
   const receiveHelperText = receiveType === 'fiat'
