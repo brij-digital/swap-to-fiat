@@ -531,6 +531,9 @@ export default function SwapCard() {
     ? `${receiveAmount || '0'} ${selectedCryptoReceiveToken.name}`
     : formatFiatValue(receiveAmount, receiveToken?.code || detectedCurrency || 'EUR');
 
+  const payAssetTypeLabel = isOnRamp ? 'Fiat' : 'Crypto';
+  const receiveAssetTypeLabel = isOnRamp ? 'Crypto' : 'Fiat';
+
   return (
     <div className="mx-auto w-full max-w-xl">
       <TokenSelectorModal
@@ -574,7 +577,10 @@ export default function SwapCard() {
       <div className="rounded-[2rem] border border-white/8 bg-[#0d1828]/90 p-4 shadow-[0_32px_90px_rgba(2,8,23,0.5)] backdrop-blur-xl">
         <div className="rounded-[1.75rem] border border-white/6 bg-[#142338] p-5 shadow-[inset_0_1px_0_rgba(191,233,255,0.05)]">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <span className="text-sm font-medium text-slate-400">You pay</span>
+            <div>
+              <div className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-cyan-300">{payAssetTypeLabel}</div>
+              <div className="mt-1 text-sm font-medium text-slate-400">You pay</div>
+            </div>
             {isOnRamp ? (
               <TokenSelectorButton
                 selected={payToken}
@@ -624,7 +630,10 @@ export default function SwapCard() {
 
         <div className="rounded-[1.75rem] border border-white/6 bg-[#101f31] p-5 shadow-[inset_0_1px_0_rgba(191,233,255,0.05)]">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <span className="text-sm font-medium text-slate-400">You receive</span>
+            <div>
+              <div className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-cyan-300">{receiveAssetTypeLabel}</div>
+              <div className="mt-1 text-sm font-medium text-slate-400">You receive</div>
+            </div>
             {isOnRamp ? (
               <TokenSelectorButton
                 selected={selectedCryptoReceiveToken}
