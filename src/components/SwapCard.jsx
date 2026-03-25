@@ -94,7 +94,6 @@ function TokenSelectorModal({ isOpen, title, tokens, selected, loading, onClose,
     );
   }, [search, tokens]);
 
-  const quickPicks = filteredTokens.slice(0, 6);
   const fiatTokens = filteredTokens.filter((token) => token.type === 'fiat');
   const cryptoTokens = filteredTokens.filter((token) => token.type !== 'fiat');
 
@@ -168,26 +167,18 @@ function TokenSelectorModal({ isOpen, title, tokens, selected, loading, onClose,
           </div>
         ) : (
           <>
-            {quickPicks.length > 0 && (
+            {(fiatTokens.length > 0 || cryptoTokens.length > 0) && (
               <div className="mb-6 flex flex-wrap gap-3">
-                {quickPicks.map((token) => (
-                  <button
-                    key={token.id}
-                    type="button"
-                    onClick={() => {
-                      onSelect(token);
-                      onClose();
-                    }}
-                    className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${
-                      selected?.id === token.id
-                        ? 'border-cyan-300/40 bg-[#1b3352] text-white'
-                        : 'border-white/10 bg-[#1a2a43] text-slate-100 hover:border-cyan-400/25'
-                    }`}
-                  >
-                    <img src={token.icon} alt={token.name} className="h-7 w-7 rounded-full object-cover" />
-                    <span className="font-semibold">{token.name}</span>
-                  </button>
-                ))}
+                {fiatTokens.length > 0 && (
+                  <div className="rounded-full border border-white/10 bg-[#16253b] px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
+                    Fiat
+                  </div>
+                )}
+                {cryptoTokens.length > 0 && (
+                  <div className="rounded-full border border-cyan-300/20 bg-[#16304d] px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">
+                    Crypto
+                  </div>
+                )}
               </div>
             )}
 
@@ -202,9 +193,7 @@ function TokenSelectorModal({ isOpen, title, tokens, selected, loading, onClose,
 
             {cryptoTokens.length > 0 && (
               <div>
-                <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  {fiatTokens.length > 0 ? 'Crypto' : 'All Assets'}
-                </div>
+                <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Crypto</div>
                 <div className="rounded-[1.5rem] border border-white/8 bg-[#16253b] p-2">
                   {cryptoTokens.map(renderTokenRow)}
                 </div>
