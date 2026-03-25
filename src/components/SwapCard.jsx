@@ -1,22 +1,20 @@
-import { useState, useRef, useEffect } from 'react';
-import { 
-  getSupportedPaymentMethods,
-  getAvailablePartners, 
+import { useEffect, useRef, useState } from 'react';
+import {
   createRedirectOrder,
+  getAvailablePartners,
+  getSupportedPaymentMethods,
 } from '../services/brij';
 
 const BASE = import.meta.env.BASE_URL;
 
-// Currency symbols for display
 const CURRENCY_SYMBOLS = {
   EUR: '€', USD: '$', GBP: '£', AUD: 'A$', CAD: 'C$', CHF: 'CHF', JPY: '¥',
   CZK: 'Kč', PLN: 'zł', SEK: 'kr', NOK: 'kr', DKK: 'kr', BRL: 'R$', MXN: '$',
-  INR: '₹', SGD: 'S$', HKD: 'HK$', NZD: 'NZ$', ZAR: 'R', THB: '฿', PHP: '₱',
+  INR: '₹', SGD: 'S$', HKD: 'HK$', NZD: 'N$', ZAR: 'R', THB: '฿', PHP: '₱',
   IDR: 'Rp', MYR: 'RM', VND: '₫', TRY: '₺', ILS: '₪', AED: 'د.إ', SAR: '﷼',
   KRW: '₩', ARS: '$', COP: '$', CLP: '$', PEN: 'S/',
 };
 
-// ISO 3166-1 alpha-3 to alpha-2 mapping for flags
 const COUNTRY_CODE_MAP = {
   ESP: 'es', FRA: 'fr', DEU: 'de', ITA: 'it', PRT: 'pt', NLD: 'nl', BEL: 'be',
   AUT: 'at', IRL: 'ie', FIN: 'fi', GRC: 'gr', LUX: 'lu', SVN: 'si', SVK: 'sk',
@@ -28,43 +26,27 @@ const COUNTRY_CODE_MAP = {
   CHL: 'cl', PER: 'pe', RUS: 'ru', CHN: 'cn', TWN: 'tw',
 };
 
-// Sell tokens (crypto) - hardcoded
-const SELL_TOKENS = [
-  { id: 'SOL', name: 'SOL', icon: `${BASE}sol.svg`, code: 'SOLANA_SOL' },
-  { id: 'USDC', name: 'USDC', icon: `${BASE}usdc.svg`, code: 'SOLANA_USDC' },
+const CRYPTO_TOKENS = [
+  { id: 'SOL', name: 'SOL', icon: `${BASE}sol.svg`, code: 'SOLANA_SOL', type: 'crypto', decimals: 4 },
+  { id: 'USDC', name: 'USDC', icon: `${BASE}usdc.svg`, code: 'SOLANA_USDC', type: 'crypto', decimals: 2 },
 ];
 
-// Hardcoded crypto buy options
-const CRYPTO_BUY_TOKENS = [
-  { id: 'USDC', name: 'USDC', icon: `${BASE}usdc.svg`, code: 'SOLANA_USDC', type: 'crypto' },
-];
-
-function TokenDropdown({ tokens, selected, onSelect, loading, showTabs = false }) {
+function TokenDropdown({ tokens, selected, onSelect, loading }) {
   const [open, setOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('fiat'); // 'crypto' or 'fiat'
   const ref = useRef(null);
 
-  // Separate tokens by type
-  const cryptoTokens = tokens.filter(t => t.type === 'crypto');
-  const fiatTokens = tokens.filter(t => t.type === 'fiat');
-  const hasBothTypes = cryptoTokens.length > 0 && fiatTokens.length > 0;
-
   useEffect(() => {
-    const handleClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    const handleClick = (event) => {
+      if (ref.current && !ref.current.contains(event.target)) {
+        setOpen(false);
+      }
     };
+
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  // Set active tab based on selected token when opening
-  useEffect(() => {
-    if (open && selected) {
-      setActiveTab(selected.type === 'crypto' ? 'crypto' : 'fiat');
-    }
-  }, [open, selected]);
-
-  if (loading) {
+  if (loading || !selected) {
     return (
       <div className="flex items-center gap-2 rounded-full border border-white/8 bg-[#17263a] px-3 py-2 text-sm text-slate-300">
         <div className="h-6 w-6 animate-pulse rounded-full bg-slate-600"></div>
@@ -73,68 +55,38 @@ function TokenDropdown({ tokens, selected, onSelect, loading, showTabs = false }
     );
   }
 
-  const displayTokens = showTabs && hasBothTypes 
-    ? (activeTab === 'crypto' ? cryptoTokens : fiatTokens)
-    : tokens;
-
   return (
     <div className="relative" ref={ref}>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={() => setOpen((value) => !value)}
         className="flex items-center gap-2 rounded-full border border-white/8 bg-[#17263a] px-3 py-2 text-slate-100 transition hover:border-cyan-400/30 hover:bg-[#1b2d45]"
       >
-        <img src={selected.icon} alt={selected.name} className="h-6 w-6 rounded-full" />
-        <span className="font-semibold tracking-[-0.02em]">{selected.name}</span>
-        <svg className={`w-4 h-4 transition ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <img src={selected.icon} alt={selected.name} className="h-6 w-6 rounded-full object-cover" />
+        <span className="max-w-[12rem] truncate font-semibold tracking-[-0.02em]">{selected.name}</span>
+        <svg className={`h-4 w-4 transition ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-      
+
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 min-w-[240px] overflow-hidden rounded-2xl border border-white/10 bg-[#0d1828]/95 shadow-[0_24px_80px_rgba(2,8,23,0.55)] backdrop-blur-xl">
-          {/* Tabs - only show if both types exist and showTabs is true */}
-          {showTabs && hasBothTypes && (
-            <div className="p-2">
-              <div className="flex rounded-full bg-[#09111d] p-1">
-                <button
-                  onClick={() => setActiveTab('crypto')}
-                  className={`flex-1 py-2 px-4 rounded-full text-sm font-medium transition ${
-                    activeTab === 'crypto' 
-                      ? 'bg-[#2a4f78] text-white shadow-[inset_0_1px_0_rgba(204,236,255,0.18)]' 
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Crypto
-                </button>
-                <button
-                  onClick={() => setActiveTab('fiat')}
-                  className={`flex-1 py-2 px-4 rounded-full text-sm font-medium transition ${
-                    activeTab === 'fiat' 
-                      ? 'bg-[#2a4f78] text-white shadow-[inset_0_1px_0_rgba(204,236,255,0.18)]' 
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Fiat
-                </button>
-              </div>
-            </div>
-          )}
-          
-          {/* Token list */}
-          <div className="max-h-[300px] overflow-y-auto">
-            {displayTokens.map((token) => (
+        <div className="absolute right-0 top-full z-50 mt-2 min-w-[260px] overflow-hidden rounded-2xl border border-white/10 bg-[#0d1828]/95 shadow-[0_24px_80px_rgba(2,8,23,0.55)] backdrop-blur-xl">
+          <div className="max-h-[320px] overflow-y-auto">
+            {tokens.map((token) => (
               <button
                 key={token.id}
-                onClick={() => { onSelect(token); setOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition ${
+                onClick={() => {
+                  onSelect(token);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center gap-3 px-4 py-3 text-left transition ${
                   selected.id === token.id ? 'bg-[#16304d]' : 'hover:bg-[#12243a]'
                 }`}
               >
-                <img src={token.icon} alt={token.name} className="h-6 w-6 rounded-full" />
-                <div className="flex flex-col flex-1 min-w-0">
-                  <span className="truncate font-medium text-slate-100">{token.name}</span>
-                  {token.type === 'fiat' && token.paymentMethod && (
-                    <span className="truncate text-xs text-slate-500">{token.paymentMethod}</span>
+                <img src={token.icon} alt={token.name} className="h-7 w-7 rounded-full object-cover" />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium text-slate-100">{token.name}</div>
+                  {token.subtitle && (
+                    <div className="truncate text-xs text-slate-500">{token.subtitle}</div>
                   )}
                 </div>
                 {selected.id === token.id && (
@@ -151,101 +103,169 @@ function TokenDropdown({ tokens, selected, onSelect, loading, showTabs = false }
   );
 }
 
-// Get flag icon URL from country code
 function getFlagIcon(countryCode3) {
-  const code2 = COUNTRY_CODE_MAP[countryCode3] || countryCode3.slice(0, 2).toLowerCase();
+  const code2 = COUNTRY_CODE_MAP[countryCode3] || countryCode3?.slice(0, 2).toLowerCase() || 'eu';
   return `https://flagcdn.com/w80/${code2}.png`;
 }
 
-export default function SwapCard() {
+function createFiatOptions(currency, paymentMethods, countryCode) {
+  const fallbackIcon = getFlagIcon(countryCode);
+  return paymentMethods.map((paymentMethod) => ({
+    id: `${currency}_${paymentMethod.code}`,
+    name: `${currency} ${paymentMethod.name}`,
+    subtitle: paymentMethod.code,
+    icon: paymentMethod.icon || fallbackIcon,
+    code: currency,
+    paymentMethod: paymentMethod.code,
+    type: 'fiat',
+    decimals: 2,
+  }));
+}
+
+function formatTokenAmount(value, token) {
+  const amount = Number.parseFloat(value || '0');
+  if (!Number.isFinite(amount)) {
+    return '0';
+  }
+
+  const decimals = token?.type === 'fiat' ? 2 : token?.decimals || 4;
+  return amount.toFixed(decimals);
+}
+
+function formatFiatValue(value, currency) {
+  const symbol = CURRENCY_SYMBOLS[currency] || `${currency} `;
+  const amount = Number.parseFloat(value || '0');
+  const safeAmount = Number.isFinite(amount) ? amount.toFixed(2) : '0.00';
+  return `${symbol}${safeAmount}`;
+}
+
+export default function SwapCard({ rampMode = 'OFFRAMP' }) {
+  const isOnRamp = rampMode === 'ONRAMP';
+  const modeLabel = isOnRamp ? 'On-ramp' : 'Off-ramp';
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  
-  // Detected from API
   const [countryCode, setCountryCode] = useState(null);
   const [detectedCurrency, setDetectedCurrency] = useState(null);
-  
-  // Dynamic buy tokens
-  const [buyTokens, setBuyTokens] = useState([]);
-  const [loadingBuyTokens, setLoadingBuyTokens] = useState(true);
-  
-  const [sellToken, setSellToken] = useState(SELL_TOKENS[1]); // USDC default
-  const [buyToken, setBuyToken] = useState(null);
-  const [sellAmount, setSellAmount] = useState('');
-  const [buyAmount, setBuyAmount] = useState('');
+
+  const [payTokens, setPayTokens] = useState(CRYPTO_TOKENS);
+  const [receiveTokens, setReceiveTokens] = useState([]);
+  const [loadingPayTokens, setLoadingPayTokens] = useState(false);
+  const [loadingReceiveTokens, setLoadingReceiveTokens] = useState(true);
+
+  const [payToken, setPayToken] = useState(CRYPTO_TOKENS[1]);
+  const [receiveToken, setReceiveToken] = useState(null);
+  const [payAmount, setPayAmount] = useState('');
+  const [receiveAmount, setReceiveAmount] = useState('');
   const [bestPartner, setBestPartner] = useState(null);
 
-  // Load payment methods on mount - API auto-detects country AND currency!
+  const selectedCryptoPayToken = CRYPTO_TOKENS.find((token) => token.code === payToken?.code) || CRYPTO_TOKENS[1];
+  const selectedCryptoReceiveToken = CRYPTO_TOKENS.find((token) => token.code === receiveToken?.code) || CRYPTO_TOKENS[1];
+
   useEffect(() => {
-    const loadPaymentMethods = async () => {
-      setLoadingBuyTokens(true);
+    setError(null);
+    setLoading(false);
+    setBestPartner(null);
+    setPayAmount('');
+    setReceiveAmount('');
+
+    if (isOnRamp) {
+      setReceiveTokens(CRYPTO_TOKENS);
+      setReceiveToken(selectedCryptoReceiveToken);
+      setPayTokens([]);
+      setPayToken(null);
+      setLoadingPayTokens(true);
+      setLoadingReceiveTokens(false);
+    } else {
+      setPayTokens(CRYPTO_TOKENS);
+      setPayToken(selectedCryptoPayToken);
+      setReceiveTokens([]);
+      setReceiveToken(null);
+      setLoadingPayTokens(false);
+      setLoadingReceiveTokens(true);
+    }
+  }, [isOnRamp, selectedCryptoPayToken, selectedCryptoReceiveToken]);
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadOptions = async () => {
       try {
-        // API auto-detects country and returns the right currency
-        const result = await getSupportedPaymentMethods({
-          rampType: 'OFFRAMP',
-          fromCurrency: sellToken.code,
-          // No toCurrency - API will detect it!
-        });
-        
-        const country = result.countryCode;
-        const currency = result.toCurrency;
-        
-        setCountryCode(country);
-        setDetectedCurrency(currency);
-        
-        // Convert payment methods to buy tokens (max 3)
-        const methods = (result.paymentMethods || []).slice(0, 3);
-        const flagIcon = getFlagIcon(country);
-        
-        const fiatTokens = methods.map((pm) => ({
-          id: `${currency}_${pm.code}`,
-          name: `${currency} ${pm.name}`,
-          icon: flagIcon,
-          code: currency,
-          paymentMethod: pm.code,
-          type: 'fiat',
-        }));
-        
-        // Combine crypto + fiat options
-        const allTokens = [...CRYPTO_BUY_TOKENS, ...fiatTokens];
-        setBuyTokens(allTokens);
-        
-        // Default to first fiat option
-        if (fiatTokens.length > 0) {
-          setBuyToken(fiatTokens[0]);
-        } else if (allTokens.length > 0) {
-          setBuyToken(allTokens[0]);
+        setError(null);
+
+        if (isOnRamp) {
+          const targetToken = selectedCryptoReceiveToken;
+          const result = await getSupportedPaymentMethods({
+            rampType: 'ONRAMP',
+            toCurrency: targetToken.code,
+          });
+
+          if (ignore) {
+            return;
+          }
+
+          const fiatOptions = createFiatOptions(
+            result.fromCurrency,
+            (result.paymentMethods || []).slice(0, 4),
+            result.countryCode,
+          );
+
+          setCountryCode(result.countryCode);
+          setDetectedCurrency(result.fromCurrency);
+          setPayTokens(fiatOptions);
+          setPayToken((current) => fiatOptions.find((option) => option.id === current?.id) || fiatOptions[0] || null);
+        } else {
+          const sourceToken = selectedCryptoPayToken;
+          const result = await getSupportedPaymentMethods({
+            rampType: 'OFFRAMP',
+            fromCurrency: sourceToken.code,
+          });
+
+          if (ignore) {
+            return;
+          }
+
+          const fiatOptions = createFiatOptions(
+            result.toCurrency,
+            (result.paymentMethods || []).slice(0, 4),
+            result.countryCode,
+          );
+
+          setCountryCode(result.countryCode);
+          setDetectedCurrency(result.toCurrency);
+          setReceiveTokens(fiatOptions);
+          setReceiveToken((current) => fiatOptions.find((option) => option.id === current?.id) || fiatOptions[0] || null);
         }
       } catch (err) {
-        setError('Failed to load payment methods');
-        console.error(err);
+        if (!ignore) {
+          setError('Failed to load payment methods');
+        }
       } finally {
-        setLoadingBuyTokens(false);
+        if (!ignore) {
+          if (isOnRamp) {
+            setLoadingPayTokens(false);
+          } else {
+            setLoadingReceiveTokens(false);
+          }
+        }
       }
     };
-    
-    loadPaymentMethods();
-  }, [sellToken.code]);
 
-  // Auto-fetch best quote when amount/tokens change
+    if (isOnRamp || selectedCryptoPayToken) {
+      loadOptions();
+    }
+
+    return () => {
+      ignore = true;
+    };
+  }, [isOnRamp, selectedCryptoPayToken, selectedCryptoReceiveToken]);
+
   useEffect(() => {
+    let ignore = false;
+
     const fetchQuote = async () => {
-      if (!sellAmount || parseFloat(sellAmount) <= 0 || !buyToken) {
-        setBuyAmount('');
-        setBestPartner(null);
-        return;
-      }
-
-      // Crypto to crypto - no API call needed
-      if (buyToken.type === 'crypto') {
-        setBuyAmount(sellAmount);
-        setBestPartner(null);
-        return;
-      }
-
-      // Fiat - need country code
-      if (!countryCode) {
-        setBuyAmount('');
+      if (!payAmount || Number.parseFloat(payAmount) <= 0 || !payToken || !receiveToken || !countryCode) {
+        setReceiveAmount('');
         setBestPartner(null);
         return;
       }
@@ -256,80 +276,111 @@ export default function SwapCard() {
       try {
         const result = await getAvailablePartners({
           countryCode,
-          rampType: 'OFFRAMP',
-          fromCurrency: sellToken.code,
-          toCurrency: buyToken.code,
-          paymentMethod: buyToken.paymentMethod,
-          fromAmount: sellAmount,
+          rampType: rampMode,
+          fromCurrency: isOnRamp ? payToken.code : selectedCryptoPayToken.code,
+          toCurrency: isOnRamp ? selectedCryptoReceiveToken.code : receiveToken.code,
+          paymentMethod: isOnRamp ? payToken.paymentMethod : receiveToken.paymentMethod,
+          fromAmount: payAmount,
           partnerTypes: ['REDIRECT'],
         });
 
-        const sortedPartners = (result.partners || []).sort(
-          (a, b) => parseFloat(b.toAmount || 0) - parseFloat(a.toAmount || 0)
-        );
-        
-        if (sortedPartners.length > 0) {
-          const best = sortedPartners[0];
-          setBestPartner(best);
-          setBuyAmount(parseFloat(best.toAmount || 0).toFixed(2));
-        } else {
-          setBestPartner(null);
-          setBuyAmount('0.00');
+        if (ignore) {
+          return;
         }
+
+        const sortedPartners = (result.partners || []).sort(
+          (a, b) => Number.parseFloat(b.toAmount || 0) - Number.parseFloat(a.toAmount || 0),
+        );
+
+        if (sortedPartners.length === 0) {
+          setBestPartner(null);
+          setReceiveAmount('');
+          return;
+        }
+
+        const best = sortedPartners[0];
+        const outputToken = isOnRamp ? selectedCryptoReceiveToken : receiveToken;
+
+        setBestPartner(best);
+        setReceiveAmount(formatTokenAmount(best.toAmount, outputToken));
       } catch (err) {
-        setError(err.message);
-        setBestPartner(null);
-        setBuyAmount('');
+        if (!ignore) {
+          setError(err.message);
+          setBestPartner(null);
+          setReceiveAmount('');
+        }
       } finally {
-        setLoading(false);
+        if (!ignore) {
+          setLoading(false);
+        }
       }
     };
 
-    const debounce = setTimeout(fetchQuote, 500);
-    return () => clearTimeout(debounce);
-  }, [sellAmount, sellToken, buyToken, countryCode]);
-
-  const handleSwap = async () => {
-    if (!sellAmount || parseFloat(sellAmount) <= 0) return;
-    if (bestPartner) {
-      await handleCreateOrder(bestPartner);
-    }
-  };
+    const timer = setTimeout(fetchQuote, 350);
+    return () => {
+      ignore = true;
+      clearTimeout(timer);
+    };
+  }, [
+    countryCode,
+    isOnRamp,
+    payAmount,
+    payToken,
+    rampMode,
+    receiveToken,
+    selectedCryptoPayToken,
+    selectedCryptoReceiveToken,
+  ]);
 
   const handleCreateOrder = async (partner) => {
     setLoading(true);
+
     try {
       const result = await createRedirectOrder({
         countryCode,
-        rampType: 'OFFRAMP',
-        fromCurrency: sellToken.code,
-        toCurrency: buyToken.code,
-        paymentMethod: buyToken.paymentMethod,
-        fromAmount: sellAmount,
+        rampType: rampMode,
+        fromCurrency: isOnRamp ? payToken.code : selectedCryptoPayToken.code,
+        toCurrency: isOnRamp ? selectedCryptoReceiveToken.code : receiveToken.code,
+        paymentMethod: isOnRamp ? payToken.paymentMethod : receiveToken.paymentMethod,
+        fromAmount: payAmount,
         partnerId: partner.partnerId,
       });
-      
+
       if (result.redirectUrl) {
         window.location.href = result.redirectUrl;
       }
     } catch (err) {
       setError(err.message);
-    } finally {
       setLoading(false);
     }
   };
 
-  const getButtonText = () => {
-    if (loading) return 'Loading...';
-    if (!sellAmount) return 'Enter amount';
-    if (buyToken?.type === 'crypto') return 'Swap (Coming soon)';
-    if (bestPartner) {
-      return `Withdraw via ${bestPartner.partnerName}`;
+  const handleSwap = async () => {
+    if (!bestPartner || !payAmount || Number.parseFloat(payAmount) <= 0) {
+      return;
     }
-    return 'Get Quote';
+
+    await handleCreateOrder(bestPartner);
   };
 
-  const currencySymbol = CURRENCY_SYMBOLS[detectedCurrency] || detectedCurrency || '';
+  const getButtonText = () => {
+    if (loading) return 'Loading...';
+    if (!payAmount) return 'Enter amount';
+    if (bestPartner) {
+      return isOnRamp ? `Buy via ${bestPartner.partnerName}` : `Withdraw via ${bestPartner.partnerName}`;
+    }
+    return isOnRamp ? 'Get buy quote' : 'Get payout quote';
+  };
+
+  const payHelperText = isOnRamp
+    ? formatFiatValue(payAmount, payToken?.code || detectedCurrency || 'EUR')
+    : payAmount
+      ? `$${(Number.parseFloat(payAmount) * (selectedCryptoPayToken.code === 'SOLANA_SOL' ? 150 : 1)).toFixed(2)}`
+      : '$0.00';
+
+  const receiveHelperText = isOnRamp
+    ? `${receiveAmount || '0'} ${selectedCryptoReceiveToken.name}`
+    : formatFiatValue(receiveAmount, receiveToken?.code || detectedCurrency || 'EUR');
 
   return (
     <div className="mx-auto w-full max-w-xl">
@@ -351,7 +402,7 @@ export default function SwapCard() {
         </div>
 
         <div className="rounded-full border border-cyan-400/15 bg-[#11233a] px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">
-          Kamino mode
+          {modeLabel}
         </div>
       </div>
 
@@ -365,29 +416,37 @@ export default function SwapCard() {
         <div className="rounded-[1.75rem] border border-white/6 bg-[#142338] p-5 shadow-[inset_0_1px_0_rgba(191,233,255,0.05)]">
           <div className="mb-4 flex items-center justify-between gap-3">
             <span className="text-sm font-medium text-slate-400">You pay</span>
-            <TokenDropdown
-              tokens={SELL_TOKENS}
-              selected={sellToken}
-              onSelect={setSellToken}
-            />
+            {isOnRamp ? (
+              <TokenDropdown
+                tokens={payTokens}
+                selected={payToken}
+                onSelect={setPayToken}
+                loading={loadingPayTokens}
+              />
+            ) : (
+              <TokenDropdown
+                tokens={CRYPTO_TOKENS}
+                selected={selectedCryptoPayToken}
+                onSelect={setPayToken}
+                loading={false}
+              />
+            )}
           </div>
 
           <div className="flex items-end justify-between gap-4">
             <div className="min-w-0 flex-1">
               <input
                 type="number"
-                value={sellAmount}
-                onChange={(e) => setSellAmount(e.target.value)}
+                value={payAmount}
+                onChange={(event) => setPayAmount(event.target.value)}
                 placeholder="0"
                 className="w-full bg-transparent text-5xl font-semibold tracking-[-0.05em] text-white outline-none placeholder:text-slate-600"
               />
-              <div className="mt-3 text-sm text-slate-500">
-                {sellAmount ? `$${(parseFloat(sellAmount) * (sellToken.code === 'SOLANA_SOL' ? 150 : 1)).toFixed(2)}` : '$0.00'}
-              </div>
+              <div className="mt-3 text-sm text-slate-500">{payHelperText}</div>
             </div>
 
             <div className="hidden rounded-2xl border border-white/6 bg-[#0e1c2c] px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 sm:block">
-              Available instantly
+              {isOnRamp ? 'Fund instantly' : 'Available instantly'}
             </div>
           </div>
         </div>
@@ -403,30 +462,26 @@ export default function SwapCard() {
         <div className="rounded-[1.75rem] border border-white/6 bg-[#101f31] p-5 shadow-[inset_0_1px_0_rgba(191,233,255,0.05)]">
           <div className="mb-4 flex items-center justify-between gap-3">
             <span className="text-sm font-medium text-slate-400">You receive</span>
-            {buyToken && (
+            {isOnRamp ? (
               <TokenDropdown
-                tokens={buyTokens}
-                selected={buyToken}
-                onSelect={setBuyToken}
-                loading={loadingBuyTokens}
-                showTabs={true}
+                tokens={CRYPTO_TOKENS}
+                selected={selectedCryptoReceiveToken}
+                onSelect={setReceiveToken}
+                loading={false}
               />
-            )}
-            {!buyToken && loadingBuyTokens && (
-              <div className="flex items-center gap-2 rounded-full border border-white/8 bg-[#17263a] px-3 py-2 text-sm text-slate-300">
-                <div className="h-6 w-6 animate-pulse rounded-full bg-slate-600"></div>
-                <span>Loading...</span>
-              </div>
+            ) : (
+              <TokenDropdown
+                tokens={receiveTokens}
+                selected={receiveToken}
+                onSelect={setReceiveToken}
+                loading={loadingReceiveTokens}
+              />
             )}
           </div>
 
           <div className="flex items-end gap-3">
-            <div className={`text-5xl font-semibold tracking-[-0.05em] ${buyAmount ? 'text-white' : 'text-slate-600'}`}>
-              {loading ? (
-                <span className="animate-pulse">...</span>
-              ) : (
-                buyAmount || '0'
-              )}
+            <div className={`text-5xl font-semibold tracking-[-0.05em] ${receiveAmount ? 'text-white' : 'text-slate-600'}`}>
+              {loading ? <span className="animate-pulse">...</span> : receiveAmount || '0'}
             </div>
             {bestPartner && (
               <div className="mb-2 flex items-center gap-2 rounded-full border border-cyan-400/15 bg-cyan-400/10 px-3 py-2 text-sm text-cyan-100">
@@ -436,24 +491,24 @@ export default function SwapCard() {
             )}
           </div>
 
-          <div className="mt-3 text-sm text-slate-500">
-            {buyAmount && buyToken?.type === 'fiat' ? `${currencySymbol}${parseFloat(buyAmount).toFixed(2)}` : '$0.00'}
-          </div>
+          <div className="mt-3 text-sm text-slate-500">{receiveHelperText}</div>
         </div>
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="rounded-2xl border border-white/6 bg-[#0b1624] px-4 py-3 text-sm text-slate-400">
-            {bestPartner && sellAmount ? `Best payout via ${bestPartner.partnerName}` : 'Enter an amount to fetch the best fiat payout.'}
+            {bestPartner && payAmount
+              ? `${isOnRamp ? 'Best buy route' : 'Best payout route'} via ${bestPartner.partnerName}`
+              : `Enter an amount to fetch the best ${isOnRamp ? 'on-ramp' : 'off-ramp'} quote.`}
           </div>
 
           <div className="rounded-2xl border border-white/6 bg-[#0b1624] px-4 py-3 text-sm text-slate-400">
-            {buyToken?.type === 'crypto' ? 'Crypto receive is preview-only for now.' : 'Redirect checkout after quote confirmation.'}
+            Redirect checkout after quote confirmation.
           </div>
         </div>
 
         <button
           onClick={handleSwap}
-          disabled={loading || !sellAmount || !bestPartner || buyToken?.type === 'crypto'}
+          disabled={loading || !payAmount || !bestPartner}
           className="mt-4 w-full rounded-[1.4rem] bg-[linear-gradient(180deg,#396690_0%,#274c72_100%)] py-4 text-lg font-semibold text-white shadow-[0_18px_40px_rgba(21,59,97,0.42)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {getButtonText()}
