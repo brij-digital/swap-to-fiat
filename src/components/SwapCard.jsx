@@ -365,6 +365,12 @@ export default function SwapCard() {
         : isFiatToFiatFlow
           ? 'Fiat -> Fiat'
           : 'Select pair';
+  const onRampPartnerProbeAmount = payType === 'fiat' && Number.parseFloat(payAmount) > 0
+    ? payAmount
+    : PARTNER_PROBE_AMOUNTS.default;
+  const offRampPartnerProbeAmount = payType === 'crypto' && Number.parseFloat(payAmount) > 0
+    ? payAmount
+    : PARTNER_PROBE_AMOUNTS[selectedCryptoPayToken.code] || PARTNER_PROBE_AMOUNTS.default;
 
   const handleSelectToken = (token) => {
     if (activeSelector === 'pay') {
@@ -410,7 +416,7 @@ export default function SwapCard() {
           fromCurrency: result.fromCurrency,
           toCurrency: selectedCryptoReceiveToken.code,
           paymentMethods: result.paymentMethods || [],
-          fromAmount: PARTNER_PROBE_AMOUNTS.default,
+          fromAmount: onRampPartnerProbeAmount,
         });
 
         if (ignore) {
@@ -448,12 +454,13 @@ export default function SwapCard() {
       }
     };
 
-    loadPayFiatOptions();
+    const timer = setTimeout(loadPayFiatOptions, 250);
 
     return () => {
       ignore = true;
+      clearTimeout(timer);
     };
-  }, [selectedCryptoReceiveToken]);
+  }, [onRampPartnerProbeAmount, selectedCryptoReceiveToken]);
 
   useEffect(() => {
     let ignore = false;
@@ -477,7 +484,7 @@ export default function SwapCard() {
           fromCurrency: selectedCryptoPayToken.code,
           toCurrency: result.toCurrency,
           paymentMethods: result.paymentMethods || [],
-          fromAmount: PARTNER_PROBE_AMOUNTS[selectedCryptoPayToken.code] || PARTNER_PROBE_AMOUNTS.default,
+          fromAmount: offRampPartnerProbeAmount,
         });
 
         if (ignore) {
@@ -515,12 +522,13 @@ export default function SwapCard() {
       }
     };
 
-    loadReceiveFiatOptions();
+    const timer = setTimeout(loadReceiveFiatOptions, 250);
 
     return () => {
       ignore = true;
+      clearTimeout(timer);
     };
-  }, [selectedCryptoPayToken]);
+  }, [offRampPartnerProbeAmount, selectedCryptoPayToken]);
 
   useEffect(() => {
     if (payToken?.type === 'fiat') {
@@ -566,6 +574,7 @@ export default function SwapCard() {
         );
 
         if (sortedPartners.length === 0) {
+          setError('No partner available for this payment method at this amount.');
           setBestPartner(null);
           setReceiveAmount('');
           return;
