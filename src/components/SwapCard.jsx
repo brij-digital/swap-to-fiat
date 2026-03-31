@@ -342,12 +342,13 @@ export default function SwapCard() {
 
   const selectedCryptoPayToken = CRYPTO_TOKENS.find((token) => token.code === payToken?.code) || CRYPTO_TOKENS[1];
   const selectedCryptoReceiveToken = CRYPTO_TOKENS.find((token) => token.code === receiveToken?.code) || CRYPTO_TOKENS[1];
-  const modalTokens = mergeUniqueTokens(CRYPTO_TOKENS, payFiatTokens, receiveFiatTokens);
+  const selectorFiatTokens = activeSelector === 'pay' ? payFiatTokens : receiveFiatTokens;
+  const modalTokens = mergeUniqueTokens(CRYPTO_TOKENS, selectorFiatTokens);
 
   const selectorTitle = activeSelector === 'pay' ? 'Select asset you pay with' : 'Select asset you receive';
   const selectorTokens = modalTokens;
   const selectorSelected = activeSelector === 'pay' ? payToken : receiveToken;
-  const selectorLoading = false;
+  const selectorLoading = activeSelector === 'pay' ? loadingPayFiatTokens : loadingReceiveFiatTokens;
 
   const payType = payToken?.type || null;
   const receiveType = receiveToken?.type || null;
@@ -574,7 +575,6 @@ export default function SwapCard() {
         );
 
         if (sortedPartners.length === 0) {
-          setError('No partner available for this payment method at this amount.');
           setBestPartner(null);
           setReceiveAmount('');
           return;
